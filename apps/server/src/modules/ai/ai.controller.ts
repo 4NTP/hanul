@@ -39,6 +39,7 @@ export class AIController {
   }
 
   @Get('chat')
+  @UseGuards(TokensGuard)
   async getChat(@CurrentUser() user) {
     return await this.aiService.getChattings(user?.name);
   }
