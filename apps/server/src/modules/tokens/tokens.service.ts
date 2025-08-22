@@ -4,12 +4,13 @@ import { JwtService } from '@nestjs/jwt';
 import { DbService } from '../db/db.service';
 import { ApiResponseError } from '@/types/api-response/api-response-error';
 import bcrypt from 'bcrypt';
+import { Env } from '../config/env.schema';
 
 @Injectable()
 export class TokensService {
   constructor(
     private readonly jwtService: JwtService,
-    private readonly configService: ConfigService,
+    private readonly configService: ConfigService<Env>,
     private readonly db: DbService,
   ) {}
 

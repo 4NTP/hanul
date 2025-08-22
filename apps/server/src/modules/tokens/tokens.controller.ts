@@ -5,12 +5,13 @@ import { TokensSignInRequestDto, TokensSignInResponseDto } from './tokens.dto';
 import { Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { ZodResponse } from 'nestjs-zod';
+import { Env } from '../config/env.schema';
 
 @Controller('tokens')
 export class TokensController {
   constructor(
     private readonly tokensService: TokensService,
-    private readonly configService: ConfigService,
+    private readonly configService: ConfigService<Env>,
   ) {}
 
   @Post()

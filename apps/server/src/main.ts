@@ -9,6 +9,8 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { INestApplication } from '@nestjs/common';
 import { cleanupOpenApiDoc } from 'nestjs-zod';
 import winstonDaily from 'winston-daily-rotate-file';
+import { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
+import { Env } from './modules/config/env.schema';
 
 const bootstrap = async () => {
   const logger = createLogger();
@@ -16,10 +18,17 @@ const bootstrap = async () => {
     logger: logger,
   });
   app.use(helmet());
-  app.enableCors();
 
-  const configService = app.get<ConfigService>(ConfigService);
+  const configService = app.get<ConfigService<Env>>(ConfigService);
   const port = configService.get('PORT') ?? 3000;
+  const corsOrigin: string | string[] =
+    configService.get('CORS_ORIGIN')?.split(',') || 'http://localhost:3000';
+
+  app.enableCors({
+    origin: corsOrigin,
+    credentials: true,
+    methods: '*',
+  } as CorsOptions);
 
   createSwagger(app);
 
