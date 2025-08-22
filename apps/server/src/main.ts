@@ -8,6 +8,7 @@ import { DateTime } from 'luxon';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { INestApplication } from '@nestjs/common';
 import { cleanupOpenApiDoc } from 'nestjs-zod';
+import cookieParser from 'cookie-parser';
 import winstonDaily from 'winston-daily-rotate-file';
 import { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
 import { Env } from './modules/config/env.schema';
@@ -18,6 +19,7 @@ const bootstrap = async () => {
     logger: logger,
   });
   app.use(helmet());
+  app.use(cookieParser());
 
   const configService = app.get<ConfigService<Env>>(ConfigService);
   const port = configService.get('PORT') ?? 3000;

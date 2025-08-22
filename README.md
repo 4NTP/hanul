@@ -16,6 +16,8 @@ This project leverages numerous open source packages to provide a robust develop
 - **[@nestjs/config](https://github.com/nestjs/nest)** (v4.0.2) - Configuration management for NestJS applications
 - **[@nestjs/jwt](https://github.com/nestjs/nest)** (v11.0.0) - JWT authentication utilities for NestJS
 - **[@nestjs/swagger](https://github.com/nestjs/nest)** (v11.2.0) - OpenAPI/Swagger documentation generation
+- **[@nestjs/websockets](https://github.com/nestjs/nest)** (v11.1.6) - WebSockets module for NestJS applications
+- **[@nestjs/platform-socket.io](https://github.com/nestjs/nest)** (v11.1.6) - Socket.io integration for NestJS WebSockets
 
 #### Frontend (Next.js & React)
 
@@ -53,10 +55,15 @@ This project leverages numerous open source packages to provide a robust develop
 - **[lucide-react](https://github.com/lucide-icons/lucide)** (v0.539.0) - Beautiful & consistent icon toolkit
 - **[Pretendard](https://github.com/orioncactus/pretendard)** - Modern Korean font family with excellent readability
 
+### Real-time Communication
+
+- **[socket.io](https://github.com/socketio/socket.io)** (v4.8.1) - Server-side real-time event-based communication framework
+
 ### Security & Authentication
 
 - **[bcrypt](https://github.com/kelektiv/node.bcrypt.js)** (v6.0.0) - Password hashing library
 - **[helmet](https://github.com/helmetjs/helmet)** (v8.1.0) - Security middleware for Express.js applications
+- **[cookie-parser](https://github.com/expressjs/cookie-parser)** (v1.4.6) - Parse HTTP request cookies for Express.js applications
 
 ### Utilities & Development Tools
 

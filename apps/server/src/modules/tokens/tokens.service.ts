@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { DbService } from '../db/db.service';
@@ -68,5 +68,17 @@ export class TokensService {
       accessTokenExpiresIn,
       refreshTokenExpiresIn,
     };
+  }
+
+  async decodeToken(token: string): Promise<any> {
+    try {
+      const decoded = this.jwtService.decode(
+        token,
+        this.configService.get('JWT_SECRET'),
+      );
+      return decoded;
+    } catch (error) {
+      throw new UnauthorizedException('Invalid tokens');
+    }
   }
 }
