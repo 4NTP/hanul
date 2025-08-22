@@ -44,7 +44,7 @@ services:
       - '8000:8000'
     environment:
       - DEBUG=False
-      - AUTH_ENABLED=True
+      - AUTH_ENABLED=False
       - API_KEY=LOCAL_SURF_API_KEY
       - SEARCH_PROVIDER=duckduckgo
       - DUCKDUCKGO_TIMEOUT=15
