@@ -38,6 +38,10 @@ This project leverages numerous open source packages to provide a robust develop
 - **[zod](https://github.com/colinhacks/zod)** (v4.0.17) - TypeScript-first schema declaration and validation library
 - **[nestjs-zod](https://github.com/risenforces/nestjs-zod)** (v5.0.0-beta.20250812T233646) - Integration of Zod with NestJS
 
+### AI Supports
+
+- **[openai](https://github.com/openai/openai-node)** (4.21.0) - Chat complements support by openAi
+
 ### UI Components & Styling
 
 - **[@radix-ui/react-dropdown-menu](https://github.com/radix-ui/primitives)** (v2.1.15) - Accessible dropdown menu component

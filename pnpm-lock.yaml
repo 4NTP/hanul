@@ -104,6 +104,9 @@ importers:
       nestjs-zod:
         specifier: 5.0.0-beta.20250812T233646
         version: 5.0.0-beta.20250812T233646(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/swagger@11.2.0(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)(reflect-metadata@0.2.2))(zod@4.0.17)
+      openai:
+        specifier: ^5.15.0
+        version: 5.15.0(ws@8.18.3)(zod@4.0.17)
       reflect-metadata:
         specifier: 0.2.2
         version: 0.2.2
@@ -7928,6 +7931,21 @@ packages:
       }
     engines: { node: '>=18' }
 
+  openai@5.15.0:
+    resolution:
+      {
+        integrity: sha512-kcUdws8K/A8m02I+IqFBwO51gS+87GP89yWEufGbzEi8anBz4FB/bti2QxaJdGwwY4mwJGzx85XO7TuL/Tpu1w==,
+      }
+    hasBin: true
+    peerDependencies:
+      ws: ^8.18.0
+      zod: ^3.23.8
+    peerDependenciesMeta:
+      ws:
+        optional: true
+      zod:
+        optional: true
+
   optionator@0.9.4:
     resolution:
       {
@@ -15414,6 +15432,11 @@ snapshots:
   onetime@7.0.0:
     dependencies:
       mimic-function: 5.0.1
+
+  openai@5.15.0(ws@8.18.3)(zod@4.0.17):
+    optionalDependencies:
+      ws: 8.18.3
+      zod: 4.0.17
 
   optionator@0.9.4:
     dependencies:
