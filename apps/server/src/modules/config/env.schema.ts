@@ -9,6 +9,7 @@ export const envSchema = z.object({
   JWT_ISSUER: z.string(),
   SOLAR_API_KEY: z.string(),
   CORS_ORIGIN: z.string(),
+  SURF_API_URL: z.url(),
 });
 
 export type Env = z.infer<typeof envSchema>;
