@@ -2,7 +2,7 @@
 
 import { Button } from '@hanul/ui/components/button';
 import { Input } from '@hanul/ui/components/input';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useLocale } from 'next-intl';
 import { useRouter, useParams } from 'next/navigation';
@@ -28,6 +28,9 @@ export function ChatPage() {
   const [inputValue, setInputValue] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [currentResponse, setCurrentResponse] = useState('');
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
 
   // Load chat history mutation
@@ -49,6 +52,24 @@ export function ChatPage() {
       }
     },
   });
+
+  // Scroll to bottom function
+  const scrollToBottom = useCallback(() => {
+    if (shouldAutoScroll && messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [shouldAutoScroll]);
+
+  // Handle scroll event to detect user manual scrolling
+  const handleScroll = useCallback(() => {
+    if (!chatContainerRef.current) return;
+
+    const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
+    const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+
+    // Enable auto-scroll if user scrolls near bottom, disable if they scroll up
+    setShouldAutoScroll(isNearBottom);
+  }, []);
 
   // Load messages for current chat only on initial mount with chatId
   useEffect(() => {
@@ -130,6 +151,9 @@ export function ChatPage() {
         setMessages((prev) => [...prev, aiMessage]);
         setCurrentResponse('');
 
+        // Auto-scroll to bottom after AI response
+        setTimeout(() => scrollToBottom(), 100);
+
         // Update URL without triggering refresh or data reload
         if (chatIdFromResponse && !chatId) {
           window.history.replaceState(
@@ -154,11 +178,30 @@ export function ChatPage() {
     setMessages((prev) => [...prev, userMessage]);
     sendMessageMutation.mutate(inputValue);
     setInputValue('');
+
+    // Auto-scroll to bottom after user message
+    setTimeout(() => scrollToBottom(), 100);
   };
+
+  // Auto-scroll during streaming
+  useEffect(() => {
+    if (isStreaming) {
+      scrollToBottom();
+    }
+  }, [currentResponse, isStreaming, scrollToBottom]);
+
+  // Auto-scroll when messages change
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, scrollToBottom]);
 
   return (
     <div className="flex flex-col h-[calc(100vh-3.5rem)]">
-      <div className="flex-1 overflow-y-auto p-4">
+      <div
+        ref={chatContainerRef}
+        className="flex-1 overflow-y-auto p-4"
+        onScroll={handleScroll}
+      >
         <div className="space-y-4">
           {messages.map((message) => (
             <div
@@ -272,78 +315,85 @@ export function ChatPage() {
               </div>
               <div className="max-w-[85%] sm:max-w-lg md:max-w-xl lg:max-w-2xl rounded-lg px-4 py-2 bg-muted">
                 <div className="text-sm">
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    rehypePlugins={[rehypeHighlight]}
-                    components={{
-                      p: ({ children }) => (
-                        <p className="mb-2 last:mb-0">{children}</p>
-                      ),
-                      h1: ({ children }) => (
-                        <h1 className="text-lg font-bold mb-2">{children}</h1>
-                      ),
-                      h2: ({ children }) => (
-                        <h2 className="text-base font-bold mb-2">{children}</h2>
-                      ),
-                      h3: ({ children }) => (
-                        <h3 className="text-sm font-bold mb-1">{children}</h3>
-                      ),
-                      ul: ({ children }) => (
-                        <ul className="list-disc pl-4 mb-2">{children}</ul>
-                      ),
-                      ol: ({ children }) => (
-                        <ol className="list-decimal pl-4 mb-2">{children}</ol>
-                      ),
-                      li: ({ children }) => (
-                        <li className="mb-1">{children}</li>
-                      ),
-                      blockquote: ({ children }) => (
-                        <blockquote className="border-l-4 border-muted-foreground pl-4 italic mb-2">
-                          {children}
-                        </blockquote>
-                      ),
-                      code: ({ children, className }) => {
-                        const isInline = !className;
-                        return isInline ? (
-                          <code className="bg-muted/60 border border-border px-2 py-1 rounded text-xs font-mono">
+                  <div className="inline">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      rehypePlugins={[rehypeHighlight]}
+                      components={{
+                        p: ({ children }) => (
+                          <p className="mb-2 last:mb-0 inline">{children}</p>
+                        ),
+                        h1: ({ children }) => (
+                          <h1 className="text-lg font-bold mb-2">{children}</h1>
+                        ),
+                        h2: ({ children }) => (
+                          <h2 className="text-base font-bold mb-2">
                             {children}
-                          </code>
-                        ) : (
-                          <code className={`${className} text-xs font-mono`}>
+                          </h2>
+                        ),
+                        h3: ({ children }) => (
+                          <h3 className="text-sm font-bold mb-1">{children}</h3>
+                        ),
+                        ul: ({ children }) => (
+                          <ul className="list-disc pl-4 mb-2">{children}</ul>
+                        ),
+                        ol: ({ children }) => (
+                          <ol className="list-decimal pl-4 mb-2">{children}</ol>
+                        ),
+                        li: ({ children }) => (
+                          <li className="mb-1">{children}</li>
+                        ),
+                        blockquote: ({ children }) => (
+                          <blockquote className="border-l-4 border-muted-foreground pl-4 italic mb-2">
                             {children}
-                          </code>
-                        );
-                      },
-                      pre: ({ children }) => (
-                        <pre className="bg-muted/80 border border-border p-4 rounded-lg overflow-x-auto text-xs font-mono mb-3 shadow-sm">
-                          {children}
-                        </pre>
-                      ),
-                      strong: ({ children }) => (
-                        <strong className="font-bold">{children}</strong>
-                      ),
-                      em: ({ children }) => (
-                        <em className="italic">{children}</em>
-                      ),
-                      a: ({ children, href }) => (
-                        <a
-                          href={href}
-                          className="text-blue-500 hover:text-blue-700 underline"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          {children}
-                        </a>
-                      ),
-                    }}
-                  >
-                    {currentResponse}
-                  </ReactMarkdown>
-                  <span className="animate-pulse ml-1">▋</span>
+                          </blockquote>
+                        ),
+                        code: ({ children, className }) => {
+                          const isInline = !className;
+                          return isInline ? (
+                            <code className="bg-muted/60 border border-border px-2 py-1 rounded text-xs font-mono">
+                              {children}
+                            </code>
+                          ) : (
+                            <code className={`${className} text-xs font-mono`}>
+                              {children}
+                            </code>
+                          );
+                        },
+                        pre: ({ children }) => (
+                          <pre className="bg-muted/80 border border-border p-4 rounded-lg overflow-x-auto text-xs font-mono mb-3 shadow-sm">
+                            {children}
+                          </pre>
+                        ),
+                        strong: ({ children }) => (
+                          <strong className="font-bold">{children}</strong>
+                        ),
+                        em: ({ children }) => (
+                          <em className="italic">{children}</em>
+                        ),
+                        a: ({ children, href }) => (
+                          <a
+                            href={href}
+                            className="text-blue-500 hover:text-blue-700 underline"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            {children}
+                          </a>
+                        ),
+                      }}
+                    >
+                      {currentResponse}
+                    </ReactMarkdown>
+                    <span className="animate-pulse">▋</span>
+                  </div>
                 </div>
               </div>
             </div>
           )}
+
+          {/* Invisible element to scroll to */}
+          <div ref={messagesEndRef} />
         </div>
       </div>
 
