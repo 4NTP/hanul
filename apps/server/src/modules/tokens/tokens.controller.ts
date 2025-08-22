@@ -22,7 +22,7 @@ export class TokensController {
   })
   async signIn(
     @Body() { email, password }: TokensSignInRequestDto,
-    @Res() res: Response,
+    @Res({ passthrough: true }) res: Response,
   ) {
     const { accessTokenExpiresIn, refreshTokenExpiresIn, ...tokens } =
       await this.tokensService.signIn(email, password);
