@@ -126,6 +126,7 @@ export class AIService {
     }));
 
     return new Observable((observer) => {
+      observer.next(JSON.stringify({ id: newChat.id }));
       this.openai.chat.completions
         .create({
           model: 'solar-pro2',
