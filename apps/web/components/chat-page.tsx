@@ -113,8 +113,6 @@ export function ChatPage() {
             if (line.startsWith('data: ')) {
               const data = line.substring(6); // Remove 'data: ' prefix but keep spaces
 
-              console.log('Raw data chunk:', JSON.stringify(data));
-
               // Check for chat ID in JSON format (for new chats)
               if (!chatId && data.includes('"id"')) {
                 try {
