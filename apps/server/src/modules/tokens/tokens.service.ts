@@ -72,10 +72,9 @@ export class TokensService {
 
   async decodeToken(token: string): Promise<any> {
     try {
-      const decoded = this.jwtService.decode(
-        token,
-        this.configService.get('JWT_SECRET'),
-      );
+      const decoded = await this.jwtService.verifyAsync(token, {
+        secret: this.configService.get('JWT_SECRET'),
+      });
       return decoded;
     } catch (error) {
       throw new UnauthorizedException('Invalid tokens');
