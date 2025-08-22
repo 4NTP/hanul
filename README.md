@@ -2,6 +2,22 @@
 
 A full-stack monorepo application built with modern technologies for scalable web development.
 
+## Getting Started
+
+### Clone with Submodules
+
+This project includes git submodules. Clone with:
+
+```bash
+git clone --recurse-submodules https://github.com/2NTP/hanul.git
+```
+
+If you've already cloned the repository, initialize submodules with:
+
+```bash
+git submodule update --init --recursive
+```
+
 ## Open Source Dependencies
 
 This project leverages numerous open source packages to provide a robust development experience. Below is a comprehensive list of the key dependencies used across the monorepo.
@@ -39,9 +55,10 @@ This project leverages numerous open source packages to provide a robust develop
 - **[zod](https://github.com/colinhacks/zod)** (v4.0.17) - TypeScript-first schema declaration and validation library
 - **[nestjs-zod](https://github.com/risenforces/nestjs-zod)** (v5.0.0-beta.20250812T233646) - Integration of Zod with NestJS
 
-### AI Supports
+### AI & Search Services
 
 - **[openai](https://github.com/openai/openai-node)** (4.21.0) - Chat complements support by openAi
+- **[surf](https://github.com/44za12/surf)** (submodule) - Web search functionality for LLM integration
 
 ### UI Components & Styling
 
@@ -53,10 +70,6 @@ This project leverages numerous open source packages to provide a robust develop
 - **[tailwind-merge](https://github.com/dcastil/tailwind-merge)** (v3.3.1) - Merge Tailwind CSS classes without style conflicts
 - **[lucide-react](https://github.com/lucide-icons/lucide)** (v0.539.0) - Beautiful & consistent icon toolkit
 - **[Pretendard](https://github.com/orioncactus/pretendard)** - Modern Korean font family with excellent readability
-
-### Real-time Communication
-
-- **[socket.io](https://github.com/socketio/socket.io)** (v4.8.1) - Server-side real-time event-based communication framework
 
 ### Security & Authentication
 
