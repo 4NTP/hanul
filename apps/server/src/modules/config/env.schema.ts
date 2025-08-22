@@ -6,6 +6,7 @@ export const envSchema = z.object({
   SERVER_URL: z.url(),
   JWT_SECRET: z.string(),
   JWT_ISSUER: z.string(),
+  SOLAR_API_KEY: z.string(),
 });
 
 export type Env = z.infer<typeof envSchema>;
