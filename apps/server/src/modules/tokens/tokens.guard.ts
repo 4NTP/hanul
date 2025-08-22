@@ -12,7 +12,8 @@ export class TokensGuard implements CanActivate {
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
     const request = ctx.switchToHttp().getRequest();
-    const accessToken = request.cookies?.accessToken;
+    const accessToken = request.headers.authorization?.split(' ')[1];
+    console.log(accessToken);
     if (!accessToken) {
       throw new UnauthorizedException('Invalid tokens');
     }
