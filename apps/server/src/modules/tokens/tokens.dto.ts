@@ -19,3 +19,5 @@ export const TokensSignInResponseDtoSchema = z.object({
 export class TokensSignInResponseDto extends createApiResponseDto(
   TokensSignInResponseDtoSchema,
 ) {}
+
+export class TokensSignOutResponseDto extends createApiResponseDto() {}

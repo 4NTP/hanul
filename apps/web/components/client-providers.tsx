@@ -1,8 +1,8 @@
 'use client';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-
 import { ThemeProvider } from 'next-themes';
+import { AuthProvider } from '@/contexts/auth-context';
 
 function makeQueryClient() {
   return new QueryClient({
@@ -28,7 +28,15 @@ function getQueryClient() {
   return browserQueryClient;
 }
 
-export function ClientProviders({ children }: { children: React.ReactNode }) {
+interface ClientProvidersProps {
+  children: React.ReactNode;
+  initialUser?: any;
+}
+
+export function ClientProviders({
+  children,
+  initialUser,
+}: ClientProvidersProps) {
   const queryClient = getQueryClient();
 
   return (
@@ -40,7 +48,7 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
         disableTransitionOnChange
         enableColorScheme
       >
-        {children}
+        <AuthProvider initialUser={initialUser}>{children}</AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

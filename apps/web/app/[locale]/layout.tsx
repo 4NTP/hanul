@@ -6,6 +6,7 @@ import { ClientProviders } from '@/components/client-providers';
 import { ServerProviders } from '@/components/server-providers';
 import Navbar from '@/components/navbar';
 import Footer from '@/components/footer';
+import { getServerUser } from '@/lib/auth/server-auth';
 
 const pretendard = localFont({
   src: '../../fonts/PretendardVariable.woff2',
@@ -27,12 +28,13 @@ export default async function RootLayout({
   params: Promise<{ locale: string }>;
 }>) {
   const { locale } = await params;
+  const user = await getServerUser();
 
   return (
     <html lang={locale} suppressHydrationWarning>
       <body className={`${pretendard.className}`}>
         <ServerProviders params={params}>
-          <ClientProviders>
+          <ClientProviders initialUser={user}>
             <div className="flex min-h-svh flex-col">
               <Navbar />
               <main className="flex-1">{children}</main>

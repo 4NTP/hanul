@@ -47,6 +47,18 @@ export const authAPI = {
     return response.json();
   },
 
+  signOut: async (): Promise<void> => {
+    const response = await fetch(`${API_BASE_URL}/tokens`, {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Sign out failed');
+    }
+  },
+
   signUp: async (data: SignUpRequest): Promise<SignUpResponse> => {
     const response = await fetch(`${API_BASE_URL}/users`, {
       method: 'POST',

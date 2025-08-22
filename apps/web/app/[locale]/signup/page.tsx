@@ -7,17 +7,18 @@ import { Button } from '@hanul/ui/components/button';
 import { Input } from '@hanul/ui/components/input';
 import { Label } from '@hanul/ui/components/label';
 import { Form, FormField, FormMessage } from '@hanul/ui/components/form';
-import { Link } from '@/i18n/navigation';
+import { Link, useRouter } from '@/i18n/navigation';
 import { authAPI, type SignUpRequest } from '@/lib/api/auth';
 
 export default function SignUpPage() {
   const t = useTranslations('Auth');
   const [error, setError] = useState('');
+  const router = useRouter();
 
   const signUpMutation = useMutation({
     mutationFn: (data: SignUpRequest) => authAPI.signUp(data),
     onSuccess: () => {
-      window.location.href = '/signin';
+      router.push('/signin');
     },
   });
 

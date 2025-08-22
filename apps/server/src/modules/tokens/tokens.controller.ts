@@ -1,7 +1,11 @@
 import { TokensService } from './tokens.service';
-import { Body, Controller, Post, Res } from '@nestjs/common';
+import { Body, Controller, Post, Delete, Res } from '@nestjs/common';
 import { ApiResponse } from '@/types/api-response/api-response';
-import { TokensSignInRequestDto, TokensSignInResponseDto } from './tokens.dto';
+import {
+  TokensSignInRequestDto,
+  TokensSignInResponseDto,
+  TokensSignOutResponseDto,
+} from './tokens.dto';
 import { Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { ZodResponse } from 'nestjs-zod';
@@ -30,14 +34,33 @@ export class TokensController {
     res.cookie('accessToken', tokens.accessToken, {
       httpOnly: true,
       secure: this.configService.get('NODE_ENV') === 'production',
-      maxAge: accessTokenExpiresIn,
+      maxAge: accessTokenExpiresIn * 1000,
     });
     res.cookie('refreshToken', tokens.refreshToken, {
       httpOnly: true,
       secure: this.configService.get('NODE_ENV') === 'production',
-      maxAge: refreshTokenExpiresIn,
+      maxAge: refreshTokenExpiresIn * 1000,
     });
 
     return ApiResponse.Ok('Tokens generated', tokens);
+  }
+
+  @Delete()
+  @ZodResponse({
+    status: 200,
+    description: 'Sign out and clear cookies',
+    type: TokensSignOutResponseDto,
+  })
+  async signOut(@Res({ passthrough: true }) res: Response) {
+    res.clearCookie('accessToken', {
+      httpOnly: true,
+      secure: this.configService.get('NODE_ENV') === 'production',
+    });
+    res.clearCookie('refreshToken', {
+      httpOnly: true,
+      secure: this.configService.get('NODE_ENV') === 'production',
+    });
+
+    return ApiResponse.Ok('Successfully signed out');
   }
 }

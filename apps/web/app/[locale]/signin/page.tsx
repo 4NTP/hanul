@@ -8,14 +8,19 @@ import { Label } from '@hanul/ui/components/label';
 import { Form, FormField, FormMessage } from '@hanul/ui/components/form';
 import { Link } from '@/i18n/navigation';
 import { authAPI, type SignInRequest } from '@/lib/api/auth';
+import { useAuth } from '@/hooks/use-auth';
+import { useRouter } from '@/i18n/navigation';
 
 export default function SignInPage() {
   const t = useTranslations('Auth');
+  const { signIn } = useAuth();
+  const router = useRouter();
 
   const signInMutation = useMutation({
     mutationFn: (data: SignInRequest) => authAPI.signIn(data),
-    onSuccess: () => {
-      window.location.href = '/';
+    onSuccess: (response) => {
+      signIn(response.data.accessToken);
+      router.push('/');
     },
   });
 
