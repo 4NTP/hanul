@@ -1,6 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
+import { Observable } from 'rxjs';
+import { DbService } from '../db/db.service';
 import { availableTools } from './tools';
 import { Env } from '../config/env.schema';
 import { ChatCompletionCreateParamsStreaming } from 'openai/resources/index';
@@ -8,11 +10,169 @@ import { ChatCompletionCreateParamsStreaming } from 'openai/resources/index';
 @Injectable()
 export class AIService {
   private openai: OpenAI;
+  history: any[] = [];
 
-  constructor(private readonly configService: ConfigService<Env>) {
+  constructor(
+    private readonly configService: ConfigService<Env>,
+    private readonly db: DbService,
+  ) {
     this.openai = new OpenAI({
       apiKey: this.configService.get('SOLAR_API_KEY'),
       baseURL: 'https://api.upstage.ai/v1',
+    });
+  }
+
+  async continueChat(userName: string, chatId: string, prompt: string) {
+    const user = await this.db.user.findFirst({
+      where: { name: userName },
+    });
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+    const chat = await this.db.chat.findFirst({
+      where: { id: chatId, authorId: user.id },
+      include: { histories: true },
+    });
+    if (!chat) {
+      throw new UnauthorizedException('Chat not found');
+    }
+
+    // TODO 여기부터 트랜잭션
+    await this.db.chat.update({
+      where: { id: chat.id },
+      data: {
+        histories: {
+          create: [
+            {
+              role: 'user',
+              content: prompt,
+            },
+          ],
+        },
+      },
+    });
+
+    const historyMessages = chat.histories.map((history) => ({
+      role: history.role as 'user' | 'assistant',
+      content: history.content,
+    }));
+    historyMessages.push({ role: 'user', content: prompt });
+
+    return new Observable((observer) => {
+      this.openai.chat.completions
+        .create({
+          model: 'solar-pro2',
+          messages: historyMessages,
+          stream: true,
+        })
+        .then(async (res) => {
+          let response = '';
+          for await (const chunk of res) {
+            response += chunk.choices[0]?.delta?.content || '';
+            observer.next(chunk.choices[0]?.delta?.content || '');
+          }
+          observer.complete();
+          await this.db.chat.update({
+            where: { id: chat.id },
+            data: {
+              histories: {
+                create: [
+                  {
+                    role: 'assistant',
+                    content: response,
+                  },
+                ],
+              },
+            },
+          });
+        })
+        .catch((err) => {
+          observer.error(err);
+        });
+    });
+  }
+
+  async startNewChat(userName: string, prompt: string) {
+    if (!userName) {
+      userName = 'string';
+    }
+    const user = await this.db.user.findFirst({
+      where: { name: userName },
+    });
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const newChat = await this.db.chat.create({
+      data: {
+        author: { connect: { id: user.id } },
+        histories: {
+          create: [
+            {
+              role: 'user',
+              content: prompt,
+            },
+          ],
+        },
+      },
+      include: {
+        histories: true,
+      },
+    });
+
+    const historyMessages = newChat.histories.map((history) => ({
+      role: history.role as 'user' | 'assistant',
+      content: history.content,
+    }));
+
+    return new Observable((observer) => {
+      this.openai.chat.completions
+        .create({
+          model: 'solar-pro2',
+          messages: historyMessages,
+          stream: true,
+        })
+        .then(async (res) => {
+          let response = '';
+          for await (const chunk of res) {
+            response += chunk.choices[0]?.delta?.content || '';
+            observer.next(chunk.choices[0]?.delta?.content || '');
+          }
+          observer.complete();
+          await this.db.chat.update({
+            where: { id: newChat.id },
+            data: {
+              histories: {
+                create: [
+                  {
+                    role: 'assistant',
+                    content: response,
+                  },
+                ],
+              },
+            },
+          });
+        })
+        .catch((err) => {
+          observer.error(err);
+        });
+    });
+  }
+
+  async getChattings(userName: string) {
+    if (!userName) {
+      userName = 'string';
+    }
+    const user = await this.db.user.findFirst({
+      where: { name: userName },
+    });
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    return await this.db.chat.findMany({
+      where: { authorId: user.id },
+      include: { histories: true },
     });
   }
 
@@ -29,87 +189,4 @@ export class AIService {
 
     return response;
   }
-
-  async generateWithTools(prompt: string): Promise<string> {
-    const completion = await this.openai.chat.completions.create({
-      model: 'solar-pro2',
-      messages: [{ role: 'user', content: prompt }],
-      tools: availableTools,
-      stream: true,
-    } as ChatCompletionCreateParamsStreaming);
-
-    // const message = completion.choices[0]?.message;
-
-    // if (message?.tool_calls) {
-    //   // Handle tool calls
-    //   const toolResults = await this.handleToolCalls(message.tool_calls);
-
-    //   // Continue conversation with tool results
-    //   const followUpCompletion = await this.openai.chat.completions.create({
-    //     model: 'solar-pro2',
-    //     messages: [
-    //       { role: 'user', content: prompt },
-    //       message,
-    //       ...toolResults.map((result) => ({
-    //         role: 'tool' as const,
-    //         tool_call_id: result.tool_call_id,
-    //         content: result.content,
-    //       })),
-    //     ],
-    //   });
-
-    return (
-      // followUpCompletion.choices[0]?.message?.content ||
-      'No response generated'
-    );
-    // }
-
-    // return message?.content || 'No response generated';
-  }
-
-  // private async handleToolCalls(
-  //   toolCalls: any[],
-  // ): Promise<Array<{ tool_call_id: string; content: string }>> {
-  //   const results = [];
-
-  //   for (const toolCall of toolCalls) {
-  //     const { id, function: func } = toolCall;
-  //     const { name, arguments: args } = func;
-
-  //     try {
-  //       const parsedArgs = JSON.parse(args);
-  //       let result = '';
-
-  //       switch (name) {
-  //         case 'web_search':
-  //           const searchResults = await this.webSearchService.executeWebSearch(
-  //             parsedArgs.query,
-  //             parsedArgs.num_results || 5,
-  //           );
-  //           result = this.webSearchService.formatSearchResults(searchResults);
-  //           break;
-
-  //         case 'fetch':
-  //           // Handle HTTP fetch tool (implementation needed)
-  //           result = 'Fetch tool not yet implemented';
-  //           break;
-
-  //         default:
-  //           result = `Unknown tool: ${name}`;
-  //       }
-
-  //       results.push({
-  //         tool_call_id: id,
-  //         content: result,
-  //       });
-  //     } catch (error) {
-  //       results.push({
-  //         tool_call_id: id,
-  //         content: `Error executing ${name}: ${error.message}`,
-  //       });
-  //     }
-  //   }
-
-  //   return results;
-  // }
 }
