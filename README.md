@@ -34,6 +34,7 @@ This project leverages numerous open source packages to provide a robust develop
 ### State Management & Data Fetching
 
 - **[@tanstack/react-query](https://github.com/TanStack/query)** (v5.84.2) - Powerful data synchronization for React
+- **[socket.io-client](https://github.com/socketio/socket.io-client)** (v4.8.1) - Real-time bidirectional event-based communication client
 - **[zod](https://github.com/colinhacks/zod)** (v4.0.17) - TypeScript-first schema declaration and validation library
 - **[nestjs-zod](https://github.com/risenforces/nestjs-zod)** (v5.0.0-beta.20250812T233646) - Integration of Zod with NestJS
 
@@ -46,6 +47,7 @@ This project leverages numerous open source packages to provide a robust develop
 - **[clsx](https://github.com/lukeed/clsx)** (v2.1.1) - Utility for constructing className strings
 - **[tailwind-merge](https://github.com/dcastil/tailwind-merge)** (v3.3.1) - Merge Tailwind CSS classes without style conflicts
 - **[lucide-react](https://github.com/lucide-icons/lucide)** (v0.539.0) - Beautiful & consistent icon toolkit
+- **[Pretendard](https://github.com/orioncactus/pretendard)** - Modern Korean font family with excellent readability
 
 ### Security & Authentication
 

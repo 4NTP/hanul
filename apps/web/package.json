@@ -23,13 +23,14 @@
     "next-themes": "0.4.6",
     "react": "19.1.1",
     "react-dom": "19.1.1",
-    "rm": "^0.1.8"
+    "rm": "^0.1.8",
+    "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
-    "@jest/globals": "30.0.5",
     "@hanul/eslint-config": "workspace:*",
     "@hanul/jest-config": "workspace:*",
     "@hanul/typescript-config": "workspace:*",
+    "@jest/globals": "30.0.5",
     "@playwright/test": "1.54.2",
     "@testing-library/jest-dom": "6.6.4",
     "@testing-library/react": "16.3.0",

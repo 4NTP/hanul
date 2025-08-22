@@ -139,6 +139,7 @@ Use conventional commits format:
 - Root-level deps: Add to root `package.json`
 - App-specific deps: Add to respective app's `package.json`
 - Shared deps: Consider adding to appropriate package in `packages/`
+- **IMPORTANT**: When adding any new open source library dependency, you MUST update the `README.md` file to include the new library in the "Open Source Dependencies" section with proper categorization, version, and description
 
 ### Environment Variables
 
@@ -176,6 +177,8 @@ Use conventional commits format:
 ### Frontend (Next.js) Standards
 
 - **Data Layer**: Typed REST clients with centralized base URL/headers
+- **Network Communication**: ALWAYS use TanStack Query (React Query) for all HTTP requests - never use raw fetch() or axios directly in components
+- **API Layer**: Create dedicated API service functions in `lib/api/` and use them with TanStack Query mutations/queries
 - **Rendering**: Balance SSR/CSR to avoid content flash/reflow
 - **Hooks**: Encapsulate loading/error/suspense in reusable hooks
 - **UI**: Use `@hanul/ui` primitives and shadcn patterns exclusively

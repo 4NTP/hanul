@@ -1,6 +1,7 @@
 import { Link } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import { Button } from '@hanul/ui/components/button';
+import Image from 'next/image';
 import ThemeToggle from '@/components/theme-toggle';
 import LocaleSwitcher from '@/components/locale-switcher';
 
@@ -10,20 +11,29 @@ export default function Navbar() {
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/60 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-        <Link href="/" className="font-semibold">
-          {t('brand')}
+        <Link href="/">
+          <Image
+            src="/logo.svg"
+            alt="Logo"
+            width={108}
+            height={32}
+            className="inline-block"
+          />
         </Link>
         <nav className="flex items-center gap-2">
-          <Link
+          {/* <Link
             href="/"
             className="text-sm text-foreground/80 hover:text-foreground"
           >
             {t('home')}
-          </Link>
+          </Link> */}
           <LocaleSwitcher />
           <ThemeToggle />
-          <Button asChild size="sm" variant="outline">
+          <Button asChild size="sm" variant="ghost">
             <Link href="/signin">{t('signIn')}</Link>
+          </Button>
+          <Button asChild size="sm">
+            <Link href="/signup">{t('signUp')}</Link>
           </Button>
         </nav>
       </div>
