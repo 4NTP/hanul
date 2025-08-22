@@ -1,0 +1,41 @@
+{
+  "Home": {
+    "title": "안녕하세요",
+    "button": "버튼"
+  },
+  "Nav": {
+    "brand": "Hanul",
+    "home": "홈",
+    "signIn": "로그인",
+    "theme": "테마",
+    "language": "언어",
+    "system": "시스템",
+    "light": "라이트",
+    "dark": "다크",
+    "locale": {
+      "en": "English",
+      "ko": "한국어"
+    }
+  },
+  "Landing": {
+    "badge": "AI 기반 지능형 서비스",
+    "headline": "Hanul: 지능형 AI 에이전트 서비스",
+    "subhead": "고도화된 AI 에이전트 플랫폼으로 자동화 지원의 미래를 경험해보세요.",
+    "ctaPrimary": "AI와 함께 시작",
+    "ctaSecondary": "기능 살펴보기"
+  },
+  "Auth": {
+    "signInTitle": "다시 오신 것을 환영합니다",
+    "signInSub": "계속하려면 공급자를 선택하세요",
+    "signUpTitle": "계정을 생성하세요",
+    "signUpSub": "계속하려면 공급자를 선택하세요",
+    "withGoogle": "Google로 계속",
+    "withX": "X로 계속",
+    "withApple": "Apple로 계속",
+    "termsHint": "계속하면 약관 및 개인정보 처리방침에 동의하게 됩니다.",
+    "noAccount": "아직 계정이 없나요?",
+    "signUpLink": "회원가입",
+    "haveAccount": "이미 계정이 있나요?",
+    "signInLink": "로그인"
+  }
+}

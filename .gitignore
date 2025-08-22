@@ -1,0 +1,14 @@
+node_modules
+.pnpm-store
+.turbo
+.vercel
+.next
+out
+build
+dist
+coverage
+.env*
+!.env.example
+.DS_Store
+/generated/prisma
+*.local.json

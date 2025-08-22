@@ -1,0 +1,44 @@
+{
+  "name": "@hanul/web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --turbopack --port 3001",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint . --max-warnings 0",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@hanul/server": "workspace:*",
+    "@hanul/ui": "workspace:*",
+    "@next/env": "^15.4.6",
+    "@tanstack/react-query": "^5.84.2",
+    "add": "^2.0.6",
+    "lucide-react": "0.539.0",
+    "next": "15.4.6",
+    "next-intl": "^4.3.4",
+    "next-themes": "0.4.6",
+    "react": "19.1.1",
+    "react-dom": "19.1.1",
+    "rm": "^0.1.8"
+  },
+  "devDependencies": {
+    "@jest/globals": "30.0.5",
+    "@hanul/eslint-config": "workspace:*",
+    "@hanul/jest-config": "workspace:*",
+    "@hanul/typescript-config": "workspace:*",
+    "@playwright/test": "1.54.2",
+    "@testing-library/jest-dom": "6.6.4",
+    "@testing-library/react": "16.3.0",
+    "@types/node": "24.2.1",
+    "@types/react": "19.1.9",
+    "@types/react-dom": "19.1.7",
+    "eslint": "9.33.0",
+    "jest": "30.0.5",
+    "jest-environment-jsdom": "30.0.5",
+    "typescript": "5.9.2"
+  }
+}

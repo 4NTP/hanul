@@ -1,0 +1,41 @@
+{
+  "Home": {
+    "title": "Hello World",
+    "button": "Button"
+  },
+  "Nav": {
+    "brand": "Hanul",
+    "home": "Home",
+    "signIn": "Sign In",
+    "theme": "Theme",
+    "language": "Language",
+    "system": "System",
+    "light": "Light",
+    "dark": "Dark",
+    "locale": {
+      "en": "English",
+      "ko": "한국어"
+    }
+  },
+  "Landing": {
+    "badge": "AI-Powered Intelligence",
+    "headline": "Hanul: Your Intelligent AI Agent Service",
+    "subhead": "Experience the future of automated assistance with our advanced AI agent platform.",
+    "ctaPrimary": "Start with AI",
+    "ctaSecondary": "Explore Features"
+  },
+  "Auth": {
+    "signInTitle": "Welcome back",
+    "signInSub": "Choose a provider to continue",
+    "signUpTitle": "Create your account",
+    "signUpSub": "Choose a provider to continue",
+    "withGoogle": "Continue with Google",
+    "withX": "Continue with X",
+    "withApple": "Continue with Apple",
+    "termsHint": "By continuing, you agree to our Terms and Privacy Policy.",
+    "noAccount": "Don't have an account?",
+    "signUpLink": "Sign up",
+    "haveAccount": "Already have an account?",
+    "signInLink": "Sign in"
+  }
+}

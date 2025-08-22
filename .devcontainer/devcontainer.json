@@ -1,0 +1,66 @@
+{
+  "name": "Hanul DevContainer",
+  "dockerComposeFile": ["docker-compose.yml"],
+  "service": "dev",
+  "workspaceFolder": "/workspaces/hanul",
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": "true",
+      "configureZshAsDefaultShell": "true"
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts",
+      "nodeGypDependencies": true
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "remoteUser": "vscode",
+  "updateRemoteUserUID": true,
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "bradlc.vscode-tailwindcss",
+        "eamodio.gitlens",
+        "GitHub.vscode-pull-request-github",
+        "usernamehw.errorlens",
+        "streetsidesoftware.code-spell-checker",
+        "fill-labs.dependi",
+        "ms-azuretools.vscode-docker",
+        "usernamehw.errorlens",
+        "Gruntfuggly.todo-tree",
+        "astro-build.astro-vscode",
+        "lokalise.i18n-ally",
+        "prisma.prisma"
+      ]
+    }
+  },
+  "containerEnv": {
+    "PGHOST": "db",
+    "PGUSER": "dev",
+    "PGPASSWORD": "dev",
+    "PGDATABASE": "hanul",
+    "PGPORT": "5432",
+    "TZ": "Asia/Seoul"
+  },
+  "mounts": [
+    "source=${localEnv:HOME}/.pnpm-store,target=/home/vscode/.local/share/pnpm/store,type=bind,consistency=cached"
+  ],
+  "forwardPorts": [3000, 3001, 5432],
+  "portsAttributes": {
+    "3000": {
+      "label": "app",
+      "onAutoForward": "silent"
+    },
+    "3001": {
+      "label": "server",
+      "onAutoForward": "silent"
+    },
+    "5432": {
+      "label": "postgres",
+      "onAutoForward": "silent"
+    }
+  },
+  "postCreateCommand": "bash .devcontainer/scripts/post-create.sh"
+}

@@ -1,0 +1,38 @@
+name: hanul-dev
+services:
+  dev:
+    image: mcr.microsoft.com/devcontainers/base:ubuntu
+    container_name: hanul-dev
+    command: sleep infinity
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ../:/workspaces/hanul
+    networks:
+      - devnet
+  db:
+    image: postgres:17.5
+    container_name: hanul-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: dev
+      POSTGRES_DB: hanul
+      PGDATA: /var/lib/postgresql/data
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    ports:
+      - '5432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U dev -d hanul']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - devnet
+volumes:
+  db-data:
+networks:
+  devnet:
+    driver: bridge
