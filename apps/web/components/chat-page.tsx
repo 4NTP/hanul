@@ -19,11 +19,7 @@ interface User {
   name: string;
 }
 
-interface ChatPageProps {
-  user: User;
-}
-
-export function ChatPage({ user }: ChatPageProps) {
+export function ChatPage() {
   const locale = useLocale();
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -45,7 +41,6 @@ export function ChatPage({ user }: ChatPageProps) {
 
     setMessages((prev) => [...prev, userMessage]);
 
-    // 임시 AI 응답
     setTimeout(() => {
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),

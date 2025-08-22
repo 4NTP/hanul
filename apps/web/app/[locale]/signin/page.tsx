@@ -19,7 +19,7 @@ export default function SignInPage() {
   const signInMutation = useMutation({
     mutationFn: (data: SignInRequest) => authAPI.signIn(data),
     onSuccess: (response) => {
-      signIn(response.data.accessToken);
+      signIn(response.data.accessToken, response.data.refreshToken);
       router.push('/');
     },
   });

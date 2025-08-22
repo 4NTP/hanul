@@ -12,9 +12,6 @@ export default function Navbar() {
   const t = useTranslations('Nav');
   const { user, isAuthenticated, signOut } = useAuth();
 
-  console.log('Navbar: user:', user);
-  console.log('Navbar: isAuthenticated:', isAuthenticated);
-
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/60 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
