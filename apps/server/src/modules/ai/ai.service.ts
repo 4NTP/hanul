@@ -176,18 +176,4 @@ export class AIService {
       include: { histories: true },
     });
   }
-
-  async generateText(prompt: string): Promise<string> {
-    const chatChunks = await this.openai.chat.completions.create({
-      model: 'solar-pro2',
-      messages: [{ role: 'user', content: prompt }],
-      stream: true,
-    });
-    let response = '';
-    for await (const chunk of chatChunks) {
-      response += chunk.choices[0]?.delta?.content || '';
-    }
-
-    return response;
-  }
 }
