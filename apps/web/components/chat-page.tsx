@@ -54,7 +54,7 @@ export function ChatPage() {
   };
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex flex-col h-[calc(100vh-3.5rem)]">
       <div className="flex-1 overflow-y-auto p-4">
         <div className="space-y-4">
           {messages.map((message) => (
@@ -68,7 +68,7 @@ export function ChatPage() {
                 <div className="mr-3 flex-shrink-0">
                   <Image
                     src="/symbol.svg"
-                    alt="AI"
+                    alt="Hanul"
                     width={48}
                     height={48}
                     className="rounded-full"
@@ -89,7 +89,7 @@ export function ChatPage() {
         </div>
       </div>
 
-      <div className="border-t p-4">
+      <div className="border-t p-4 bg-background">
         <div className="flex gap-2">
           <Input
             value={inputValue}
