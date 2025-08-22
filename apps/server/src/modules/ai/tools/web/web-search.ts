@@ -1,7 +1,5 @@
-import { ConfigService } from '@nestjs/config';
-import { Env } from '@/modules/config/env.schema';
-
 export const webSearchTool = {
+  type: 'function',
   name: 'web_search',
   description:
     'Search the web for current information on any topic. Use this when you need up-to-date information or facts that might not be in your training data.',
@@ -35,29 +33,28 @@ interface SurfSearchResponse {
   results: {
     title: string;
     url: string;
-    content: string;
+    snippet: string;
   }[];
-  total_results: number;
-  search_engine: string;
+  provider: string;
 }
 
 export const executeWebSearch = async (
   surfApiUrl: string,
-  query: string,
-  numResults: number = 5,
+  surfApiKey: string,
+  {
+    query,
+    numResults = 5,
+  }: {
+    query: string;
+    numResults?: number;
+  },
 ): Promise<WebSearchResult[]> => {
   try {
-    const response = await fetch(`${surfApiUrl}/search`, {
-      method: 'POST',
+    const response = await fetch(`${surfApiUrl}/search?q=${encodeURI(query)}`, {
+      method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        query,
-        num_results: Math.min(numResults, 10),
-        search_engine: 'duckduckgo',
-        format: 'json',
-      }),
+      } as any,
     });
 
     if (!response.ok) {
@@ -71,7 +68,7 @@ export const executeWebSearch = async (
     return data.results.slice(0, numResults).map((result) => ({
       title: result.title,
       url: result.url,
-      snippet: result.content.substring(0, 200) + '...',
+      snippet: result.snippet.substring(0, 200) + '...',
     }));
   } catch (error) {
     console.error('Web search error:', error);

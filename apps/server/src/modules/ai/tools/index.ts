@@ -6,7 +6,7 @@ export { webSearchTool } from './web/web-search';
 export const availableTools = [
   // HTTP Tools
   {
-    type: 'function',
+    type: 'function' as const,
     function: {
       name: 'fetch',
       description:
@@ -40,7 +40,7 @@ export const availableTools = [
 
   // Web Search Tools
   {
-    type: 'function',
+    type: 'function' as const,
     function: {
       name: 'web_search',
       description:

@@ -34,7 +34,6 @@ export class AIController {
     @CurrentUser() user,
     @Body() { prompt }: CreateTextRequestDto,
   ) {
-    console.log(user);
     return await this.aiService.startNewChat(user.name, prompt);
   }
 
