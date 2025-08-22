@@ -19,11 +19,7 @@ interface User {
   name: string;
 }
 
-interface ChatPageProps {
-  user: User;
-}
-
-export function ChatPage({ user }: ChatPageProps) {
+export function ChatPage() {
   const locale = useLocale();
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -45,7 +41,6 @@ export function ChatPage({ user }: ChatPageProps) {
 
     setMessages((prev) => [...prev, userMessage]);
 
-    // 임시 AI 응답
     setTimeout(() => {
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -59,7 +54,7 @@ export function ChatPage({ user }: ChatPageProps) {
   };
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex flex-col h-[calc(100vh-3.5rem)]">
       <div className="flex-1 overflow-y-auto p-4">
         <div className="space-y-4">
           {messages.map((message) => (
@@ -73,7 +68,7 @@ export function ChatPage({ user }: ChatPageProps) {
                 <div className="mr-3 flex-shrink-0">
                   <Image
                     src="/symbol.svg"
-                    alt="AI"
+                    alt="Hanul"
                     width={48}
                     height={48}
                     className="rounded-full"
@@ -94,7 +89,7 @@ export function ChatPage({ user }: ChatPageProps) {
         </div>
       </div>
 
-      <div className="border-t p-4">
+      <div className="border-t p-4 bg-background">
         <div className="flex gap-2">
           <Input
             value={inputValue}

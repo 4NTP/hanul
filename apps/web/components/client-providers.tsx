@@ -28,15 +28,7 @@ function getQueryClient() {
   return browserQueryClient;
 }
 
-interface ClientProvidersProps {
-  children: React.ReactNode;
-  initialUser?: any;
-}
-
-export function ClientProviders({
-  children,
-  initialUser,
-}: ClientProvidersProps) {
+export function ClientProviders({ children }: { children: React.ReactNode }) {
   const queryClient = getQueryClient();
 
   return (
@@ -48,7 +40,7 @@ export function ClientProviders({
         disableTransitionOnChange
         enableColorScheme
       >
-        <AuthProvider initialUser={initialUser}>{children}</AuthProvider>
+        <AuthProvider>{children}</AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

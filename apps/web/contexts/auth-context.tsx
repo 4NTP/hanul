@@ -27,20 +27,15 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   isAuthenticated: boolean;
-  signIn: (token: string) => void;
+  signIn: (accessToken: string, refreshToken: string) => void;
   signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-interface AuthProviderProps {
-  children: ReactNode;
-  initialUser?: User | null;
-}
-
-export function AuthProvider({ children, initialUser }: AuthProviderProps) {
-  const [user, setUser] = useState<User | null>(initialUser || null);
-  const [loading, setLoading] = useState(!initialUser);
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const parseJWT = (token: string): JWTPayload | null => {
     try {
@@ -55,31 +50,15 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
       );
       return JSON.parse(jsonPayload);
     } catch (error) {
-      console.error('Failed to parse JWT:', error);
       return null;
     }
   };
 
-  const getCookie = (name: string) => {
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) return parts.pop()?.split(';').shift();
-    return null;
-  };
-
   useEffect(() => {
-    // Skip cookie check if we already have initial user data from server
-    if (initialUser) {
-      setLoading(false);
-      return;
-    }
-
-    const token = getCookie('accessToken');
-    console.log('AuthContext: Token found:', !!token);
+    const token = localStorage.getItem('accessToken');
 
     if (token) {
       const payload = parseJWT(token);
-      console.log('AuthContext: Payload parsed:', !!payload);
 
       if (payload && payload.exp * 1000 > Date.now()) {
         const userData = {
@@ -87,19 +66,20 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
           email: payload.email,
           name: payload.name,
         };
-        console.log('AuthContext: Setting user:', userData);
         setUser(userData);
       } else {
-        console.log('AuthContext: Token expired or invalid');
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
       }
-    } else {
-      console.log('AuthContext: No token found');
     }
     setLoading(false);
-  }, [initialUser]);
+  }, []);
 
-  const signIn = (token: string) => {
-    const payload = parseJWT(token);
+  const signIn = (accessToken: string, refreshToken: string) => {
+    localStorage.setItem('accessToken', accessToken);
+    localStorage.setItem('refreshToken', refreshToken);
+
+    const payload = parseJWT(accessToken);
     if (payload) {
       setUser({
         id: payload.sub,
@@ -113,12 +93,10 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     try {
       const { authAPI } = await import('@/lib/api/auth');
       await authAPI.signOut();
-    } catch (error) {
-      console.error('Sign out API call failed:', error);
-    }
+    } catch (error) {}
 
-    document.cookie = 'accessToken=; path=/; max-age=0';
-    document.cookie = 'refreshToken=; path=/; max-age=0';
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
     setUser(null);
   };
 
