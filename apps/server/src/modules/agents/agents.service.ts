@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { DbService } from '../db/db.service';
 
 @Injectable()
@@ -70,10 +70,34 @@ export class AgentsService {
     });
   }
 
-  async deleteAgent(id: string) {
+  async deleteAgent(userId: string, id: string) {
+    const agent = await this.db.subAgent.findFirst({
+      where: { id, chat: { authorId: userId }, deletedAt: null },
+      select: { id: true },
+    });
+    if (!agent) throw new NotFoundException('Agent not found');
     return await this.db.subAgent.update({
       where: { id },
       data: { deletedAt: new Date() },
+    });
+  }
+
+  async getTrashedAgents(userId: string) {
+    return await this.db.subAgent.findMany({
+      where: { chat: { authorId: userId }, deletedAt: { not: null } },
+      orderBy: { updatedAt: 'desc' },
+    });
+  }
+
+  async restoreAgent(userId: string, id: string) {
+    const agent = await this.db.subAgent.findFirst({
+      where: { id, chat: { authorId: userId }, deletedAt: { not: null } },
+      select: { id: true },
+    });
+    if (!agent) throw new NotFoundException('Agent not found');
+    return await this.db.subAgent.update({
+      where: { id },
+      data: { deletedAt: null },
     });
   }
 }

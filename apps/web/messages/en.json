@@ -64,6 +64,12 @@
     "close": "Close",
     "save": "Save",
     "cancel": "Cancel",
+    "delete": "Delete",
+    "confirmDelete": "Delete this agent?",
+    "agentCreatedTitle": "Sub agent created",
+    "agentCreated": "New sub agent created: {name}",
+    "agentUpdatedTitle": "Sub agent updated",
+    "agentUpdated": "Sub agent prompt updated: {name}",
     "input": {
       "placeholder": "Type a message..."
     },

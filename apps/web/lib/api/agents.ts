@@ -12,6 +12,7 @@ export interface SubAgentDto {
   createdAt: string;
   updatedAt: string;
   updateHistories?: SubAgentHistory[];
+  deletedAt?: string | null;
 }
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_SERVER_URL;
@@ -50,5 +51,16 @@ export const agentsAPI = {
       throw new Error(errorData.message || 'Failed to update agent');
     }
     return await response.json();
+  },
+  delete: async (id: string): Promise<void> => {
+    const response = await fetch(`${API_BASE_URL}/agents/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+      credentials: 'include',
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to delete agent');
+    }
   },
 };
