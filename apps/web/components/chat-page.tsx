@@ -37,6 +37,7 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
   const [expandedThink, setExpandedThink] = useState<Record<string, boolean>>(
     {},
   );
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   const markdownComponents = useMemo(() => {
     return {
@@ -422,7 +423,8 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
   }, [messages, scrollToBottom]);
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)]">
+    <div className="flex h-[calc(100svh-3.5rem)]">
+      {/* Desktop sidebar */}
       <aside className="w-64 border-r overflow-y-auto p-3 hidden md:block">
         <div className="space-y-1">
           {chats.map((c) => {
@@ -444,7 +446,17 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
       </aside>
 
       <section className="flex-1 flex flex-col">
-        <div className="flex items-center justify-end p-2 border-b">
+        <div className="flex items-center justify-between p-2 border-b">
+          {/* Mobile: open chat list */}
+          <Button
+            className="md:hidden"
+            variant="outline"
+            size="sm"
+            onClick={() => setMobileSidebarOpen(true)}
+            title={t('newChat')}
+          >
+            ☰
+          </Button>
           <Button
             variant="outline"
             onClick={() => {
@@ -460,7 +472,7 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
 
         <div
           ref={chatContainerRef}
-          className="flex-1 overflow-y-auto p-4"
+          className="flex-1 overflow-y-auto p-4 pb-28 sm:pb-4"
           onScroll={handleScroll}
         >
           <div className="space-y-4">
@@ -539,7 +551,51 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
           </div>
         </div>
 
-        <div className="border-t p-4 bg-background">
+        {/* Mobile sidebar drawer */}
+        {mobileSidebarOpen && (
+          <div className="md:hidden fixed inset-0 z-50">
+            <div
+              className="absolute inset-0 bg-black/40"
+              onClick={() => setMobileSidebarOpen(false)}
+            />
+            <div className="absolute left-0 top-0 h-full w-4/5 max-w-[320px] bg-background border-r shadow-lg flex flex-col">
+              <div className="flex items-center justify-between p-3 border-b">
+                <div className="text-sm font-medium">{t('newChat')}</div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setMobileSidebarOpen(false)}
+                >
+                  ×
+                </Button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-3 space-y-1">
+                {chats.map((c) => {
+                  const isActive = c.id === chatId;
+                  const title = c.title || t('untitled');
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => {
+                        router.push(`/${locale}/chat/${c.id}`);
+                        setMobileSidebarOpen(false);
+                      }}
+                      className={`w-full text-left rounded-md px-3 py-2 transition-colors ${
+                        isActive ? 'bg-accent' : 'hover:bg-muted'
+                      }`}
+                    >
+                      <div className="text-sm font-medium truncate">
+                        {title}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="border-t p-3 sm:p-4 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="flex gap-2 items-end">
             <Textarea
               value={inputValue}
@@ -557,6 +613,7 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
                   sendMessage();
                 }
               }}
+              onFocus={() => setTimeout(() => scrollToBottom(), 100)}
             />
             <Button onClick={sendMessage} disabled={isStreaming}>
               {isStreaming ? t('sending') : t('send')}
