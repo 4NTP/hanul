@@ -1,25 +1,49 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
-import { Observable } from 'rxjs';
+import { Observable, Observer } from 'rxjs';
 import { Env } from '../config/env.schema';
 import { DbService } from '../db/db.service';
 import { availableTools } from './tools';
 import { fetchData } from './tools/http/fetch';
 import { executeWebSearch } from './tools/web/web-search';
+import { executeWebRead } from './tools/web/web-read';
+import {
+  executeSequentialThinking,
+  sequentialThinkingTool,
+} from './tools/think/sequential-thinking';
+
+type ChatMessage = {
+  role: 'user' | 'assistant' | 'tool' | 'system' | 'developer';
+  content: string;
+  tool_calls?: OpenAI.Chat.ChatCompletionMessageToolCall[];
+  tool_call_id?: string;
+  name?: string;
+};
+
+const defaultPrompt = `
+
+`;
 
 @Injectable()
 export class AIService {
   private openai: OpenAI;
+  private readonly logger = new Logger(AIService.name);
   private readonly availableFunctions = {
-    web_search: (args) => {
-      executeWebSearch(
+    fetch: fetchData,
+    sequentialThinkingTool: executeSequentialThinking,
+    web_read: async (args: { url: string }) => {
+      return await executeWebRead(
         this.configService.get('SURF_API_URL') || 'http://localhost:8000',
-        this.configService.get('SURF_API_KEY') || 'LOCAL_SURF_API_KEY',
         args,
       );
     },
-    fetch: fetchData,
+    web_search: async (args: { query: string; num_results?: number }) => {
+      return await executeWebSearch(
+        this.configService.get('SURF_API_URL') || 'http://localhost:8000',
+        args,
+      );
+    },
   };
 
   constructor(
@@ -64,14 +88,12 @@ export class AIService {
 
     const historyMessages = chat.histories.map((history) => {
       if (history.role === 'tool') {
-        // tool 메시지에는 tool_call_id가 필수입니다
         return {
           role: history.role as 'tool',
           content: history.content,
-          tool_call_id: history.toolCallId || '', // DB에서 toolCallId 필드가 있어야 합니다
+          tool_call_id: history.toolCallId || '',
         };
       } else {
-        // user와 assistant 메시지는 기존 형식대로
         return {
           role: history.role as 'user' | 'assistant',
           content: history.content,
@@ -81,123 +103,143 @@ export class AIService {
     historyMessages.push({ role: 'user', content: prompt });
 
     return new Observable((observer) => {
-      // 도구 호출 정보를 누적하기 위한 객체
-      const accumulatedToolCalls = new Map();
+      this.processConversation(historyMessages, observer, chat.id, 0).catch(
+        (err) => observer.error(err),
+      );
+    });
+  }
 
-      this.openai.chat.completions
-        .create({
-          model: 'solar-pro2',
-          messages: historyMessages,
-          tools: availableTools,
-          tool_choice: 'auto',
-          stream: true,
-        })
-        .then(async (res) => {
-          let response = '';
-          let isToolCallComplete = false;
+  private async processConversation(
+    messages: ChatMessage[],
+    observer: Observer<string>,
+    chatId: string,
+    totalTokens: number,
+    maxIterations: number = 10,
+    currentIteration: number = 0,
+  ) {
+    this.logger.log('current iter', currentIteration);
+    this.logger.log('total tokens', totalTokens);
+    // 최대 반복 또는 토큰 제한 체크
+    if (currentIteration >= maxIterations || totalTokens > 50000) {
+      observer.next('\n\n[대화가 제한에 도달하여 종료됩니다.]');
+      observer.complete();
+      return;
+    }
 
-          for await (const chunk of res) {
-            const responseNext = chunk.choices[0]?.delta;
-            const toolCalls = responseNext?.tool_calls;
+    // 메시지 형식을 OpenAI 형식으로 변환
+    const openaiMessages = messages.map((msg) => {
+      const baseMsg: any = {
+        role: msg.role,
+        content: msg.content,
+      };
 
-            if (toolCalls) {
-              for (const toolCall of toolCalls) {
-                // 인덱스를 키로 사용하여 도구 호출 정보 누적
-                const index = toolCall.index || 0;
+      if (msg.tool_calls) {
+        baseMsg.tool_calls = msg.tool_calls;
+      }
 
-                if (!accumulatedToolCalls.has(index)) {
-                  accumulatedToolCalls.set(index, {
-                    id: toolCall.id || `temp-id-${index}`,
-                    function: { name: '', arguments: '' },
-                  });
-                }
+      if (msg.tool_call_id) {
+        baseMsg.tool_call_id = msg.tool_call_id;
+      }
 
-                // 기존 정보 업데이트
-                const current = accumulatedToolCalls.get(index);
+      if (msg.name) {
+        baseMsg.name = msg.name;
+      }
 
-                if (toolCall.function?.name) {
-                  current.function.name = toolCall.function.name;
-                }
+      return baseMsg;
+    });
 
-                if (toolCall.function?.arguments) {
-                  current.function.arguments += toolCall.function.arguments;
-                }
+    const response = await this.openai.chat.completions.create({
+      model: 'solar-pro2',
+      messages: openaiMessages,
+      tools: availableTools,
+      tool_choice: 'auto',
+    } as OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming);
 
-                if (toolCall.id) {
-                  current.id = toolCall.id;
-                }
+    const message = response.choices[0]?.message;
+    const usage = response.usage;
+    totalTokens += usage?.total_tokens || 0;
+    this.logger.log('tool_calls:', message?.tool_calls);
 
-                // 도구 호출 정보가 완성되었는지 확인
-                if (
-                  current.function.name &&
-                  current.function.arguments &&
-                  current.id
-                ) {
-                  try {
-                    const functionName = current.function.name;
-                    const functionToCall =
-                      this.availableFunctions[functionName];
+    if (message?.tool_calls && message.tool_calls.length > 0) {
+      // 도구 호출이 있는 경우
+      const toolResults: ChatMessage[] = [];
 
-                    if (functionToCall) {
-                      const functionArgs = JSON.parse(
-                        current.function.arguments,
-                      );
-                      const functionResponse =
-                        await functionToCall(functionArgs);
+      for (const toolCall of message.tool_calls) {
+        try {
+          if (toolCall.type === 'function' && toolCall.function) {
+            const functionName = toolCall.function.name;
+            const functionToCall = this.availableFunctions[functionName];
 
-                      historyMessages.push({
-                        role: 'tool',
-                        tool_call_id: current.id,
-                        content: functionResponse,
-                      });
+            if (functionToCall) {
+              const functionArgs = JSON.parse(toolCall.function.arguments);
+              const functionResponse = await functionToCall(functionArgs);
 
-                      isToolCallComplete = true;
-
-                      // 도구 응답이 완성되면 바로 후속 응답 요청
-                      const secondResponse =
-                        await this.openai.chat.completions.create({
-                          model: 'solar-pro2',
-                          messages: historyMessages,
-                        });
-
-                      response +=
-                        secondResponse.choices[0]?.message?.content || '';
-                      observer.next(
-                        secondResponse.choices[0]?.message?.content || '',
-                      );
-
-                      // 이미 처리한 도구 호출은 제거
-                      accumulatedToolCalls.delete(index);
-                    }
-                  } catch (error) {
-                    console.error('도구 호출 처리 오류:', error);
-                  }
-                }
-              }
-            } else {
-              response += responseNext?.content || '';
-              observer.next(responseNext?.content || '');
+              toolResults.push({
+                role: 'tool' as const,
+                tool_call_id: toolCall.id,
+                name: functionName,
+                content: JSON.stringify(functionResponse),
+              });
             }
           }
-          observer.complete();
-          await this.db.chat.update({
-            where: { id: chat.id },
-            data: {
-              histories: {
-                create: [
-                  {
-                    role: 'assistant',
-                    content: response,
-                  },
-                ],
+        } catch (error) {
+          console.error('도구 호출 처리 오류:', error);
+          if (toolCall.type === 'function' && toolCall.function) {
+            toolResults.push({
+              role: 'tool' as const,
+              tool_call_id: toolCall.id,
+              name: toolCall.function?.name || 'unknown',
+              content: JSON.stringify({ error: '도구 호출 실패' }),
+            });
+          } else {
+            toolResults.push({
+              role: 'tool' as const,
+              tool_call_id: toolCall.id,
+              name: 'unknown',
+              content: JSON.stringify({ error: '알 수 없는 도구 호출' }),
+            });
+          }
+        }
+      }
+
+      // assistant 메시지와 tool 결과를 히스토리에 추가
+      messages.push({
+        role: 'assistant' as const,
+        content: message.content || '',
+        tool_calls: message.tool_calls,
+      });
+      messages.push(...toolResults);
+
+      // 재귀적으로 다음 응답 처리
+      await this.processConversation(
+        messages,
+        observer,
+        chatId,
+        totalTokens,
+        maxIterations,
+        currentIteration + 1,
+      );
+    } else {
+      // 일반 텍스트 응답
+      const content = message?.content || '';
+      observer.next(content);
+      observer.complete();
+
+      // DB에 최종 응답 저장
+      await this.db.chat.update({
+        where: { id: chatId },
+        data: {
+          histories: {
+            create: [
+              {
+                role: 'assistant',
+                content,
               },
-            },
-          });
-        })
-        .catch((err) => {
-          observer.error(err);
-        });
-    });
+            ],
+          },
+        },
+      });
+    }
   }
 
   async startNewChat(userName: string, prompt: string) {
@@ -236,126 +278,22 @@ export class AIService {
           content: history.content,
           name: history.name,
           tool_call_id: history.toolCallId || '', // DB에서 toolCallId 필드가 있어야 합니다
-        };
+        } as ChatMessage;
       } else {
         // user와 assistant 메시지는 기존 형식대로
         return {
           role: history.role as 'user' | 'assistant',
           content: history.content,
-        };
+        } as ChatMessage;
       }
     });
 
     return new Observable((observer) => {
       observer.next(JSON.stringify({ id: newChat.id }));
 
-      // 도구 호출 정보를 누적하기 위한 객체
-      const accumulatedToolCalls = new Map();
-
-      this.openai.chat.completions
-        .create({
-          model: 'solar-pro2',
-          messages: historyMessages,
-          tools: availableTools,
-          tool_choice: 'auto',
-          stream: true,
-        })
-        .then(async (res) => {
-          let response = '';
-          let isToolCallComplete = false;
-
-          for await (const chunk of res) {
-            const responseNext = chunk.choices[0]?.delta;
-            const toolCalls = responseNext?.tool_calls;
-
-            if (toolCalls) {
-              for (const toolCall of toolCalls) {
-                // 인덱스를 키로 사용하여 도구 호출 정보 누적
-                const index = toolCall.index || 0;
-
-                if (!accumulatedToolCalls.has(index)) {
-                  accumulatedToolCalls.set(index, {
-                    id: toolCall.id || `temp-id-${index}`,
-                    function: { name: '', arguments: '' },
-                  });
-                }
-
-                // 기존 정보 업데이트
-                const current = accumulatedToolCalls.get(index);
-
-                if (toolCall.function?.name) {
-                  current.function.name = toolCall.function.name;
-                }
-
-                if (toolCall.function?.arguments) {
-                  current.function.arguments += toolCall.function.arguments;
-                }
-
-                if (toolCall.id) {
-                  current.id = toolCall.id;
-                }
-
-                // 도구 호출 정보가 완성되었는지 확인
-                if (
-                  current.function.name &&
-                  current.function.arguments &&
-                  current.id
-                ) {
-                  try {
-                    const functionName = current.function.name;
-                    const functionToCall =
-                      this.availableFunctions[functionName];
-
-                    if (functionToCall) {
-                      const functionArgs = JSON.parse(
-                        current.function.arguments,
-                      );
-
-                      const functionResponse =
-                        await functionToCall(functionArgs);
-
-                      historyMessages.push({
-                        role: 'tool',
-                        name: current.function.name,
-                        tool_call_id: current.id,
-                        content: JSON.stringify(functionResponse),
-                      });
-
-                      isToolCallComplete = true;
-
-                      // 도구 응답이 완성되면 바로 후속 응답 요청
-                      const secondResponse =
-                        await this.openai.chat.completions.create({
-                          model: 'solar-pro2',
-                          messages: historyMessages,
-                          tools: availableTools,
-                          tool_choice: 'auto',
-                        });
-
-                      response +=
-                        secondResponse.choices[0]?.message?.content || '';
-                      observer.next(
-                        secondResponse.choices[0]?.message?.content || '',
-                      );
-
-                      // 이미 처리한 도구 호출은 제거
-                      accumulatedToolCalls.delete(index);
-                    }
-                  } catch (error) {
-                    console.error('도구 호출 처리 오류:', error);
-                  }
-                }
-              }
-            } else {
-              response += responseNext?.content || '';
-              observer.next(responseNext?.content || '');
-            }
-          }
-          observer.complete();
-        })
-        .catch((err) => {
-          observer.error(err);
-        });
+      this.processConversation(historyMessages, observer, newChat.id, 0).catch(
+        (err) => observer.error(err),
+      );
     });
   }
 

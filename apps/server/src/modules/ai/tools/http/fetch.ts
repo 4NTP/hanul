@@ -1,41 +1,33 @@
 export const fetchTool = {
-  type: 'function',
-  name: 'fetch',
-  description: 'Fetches data from a given URL using the Fetch API.',
-  parameters: {
-    type: 'object',
-    properties: {
-      url: {
-        type: 'string',
-        description: 'The URL to fetch data from.',
-      },
-      method: {
-        type: 'string',
-        description:
-          'The HTTP method to use for the request (e.g., GET, POST).',
-        default: 'GET',
-      },
-      headers: {
-        type: 'object',
-        description:
-          'An object representing the headers to include in the request.',
-        additionalProperties: {
+  type: 'function' as const,
+  function: {
+    name: 'fetch',
+    description:
+      'Fetch content from a URL. Use this to get specific web pages or API responses.',
+    parameters: {
+      type: 'object',
+      properties: {
+        url: {
           type: 'string',
+          description: 'The URL to fetch content from',
+        },
+        method: {
+          type: 'string',
+          enum: ['GET', 'POST', 'PUT', 'DELETE'],
+          default: 'GET',
+          description: 'HTTP method to use',
+        },
+        headers: {
+          type: 'object',
+          description: 'Optional HTTP headers',
+        },
+        body: {
+          type: 'string',
+          description: 'Request body for POST/PUT requests',
         },
       },
-      body: {
-        type: 'string',
-        description:
-          'The body of the request, if applicable (e.g., for POST requests).',
-      },
-      timeout: {
-        type: 'number',
-        description:
-          'The maximum time in milliseconds to wait for the request to complete.',
-        default: 10000,
-      },
+      required: ['url'],
     },
-    required: ['url'],
   },
 };
 

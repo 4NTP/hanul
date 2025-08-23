@@ -10,7 +10,6 @@ export const envSchema = z.object({
   SOLAR_API_KEY: z.string(),
   CORS_ORIGIN: z.string(),
   SURF_API_URL: z.url(),
-  SURF_API_KEY: z.string(),
 });
 
 export type Env = z.infer<typeof envSchema>;

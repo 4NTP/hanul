@@ -1,31 +1,33 @@
 export const webSearchTool = {
-  type: 'function',
-  name: 'web_search',
-  description:
-    'Search the web for current information on any topic. Use this when you need up-to-date information or facts that might not be in your training data.',
-  parameters: {
-    type: 'object',
-    properties: {
-      query: {
-        type: 'string',
-        description: 'The search query. Be specific and use relevant keywords.',
+  type: 'function' as const,
+  function: {
+    name: 'web_search',
+    description:
+      'Search the web for current information on any topic. This tool returns basic search results with titles, URLs, and brief snippets - essentially providing rough data for initial discovery. For comprehensive and detailed answers, you should follow up by using the web_read tool on specific URLs from the search results, or use the fetch tool for API endpoints. The search results alone are insufficient for detailed analysis - they serve as a starting point to identify relevant sources that require further investigation.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description:
+            'The search query. Be specific and use relevant keywords to find the most relevant sources for further analysis.',
+        },
+        num_results: {
+          type: 'number',
+          description:
+            'Number of search results to return (default: 5, max: 10). Consider requesting more results if you plan to analyze multiple sources with web_read.',
+          default: 5,
+          minimum: 1,
+          maximum: 10,
+        },
       },
-      num_results: {
-        type: 'number',
-        description: 'Number of search results to return (default: 5, max: 10)',
-        default: 5,
-        minimum: 1,
-        maximum: 10,
-      },
+      required: ['query'],
     },
-    required: ['query'],
   },
 };
 
 interface WebSearchResult {
-  title: string;
-  url: string;
-  snippet: string;
+  result: { title: string; url: string; snippet: string }[];
 }
 
 interface SurfSearchResponse {
@@ -40,21 +42,20 @@ interface SurfSearchResponse {
 
 export const executeWebSearch = async (
   surfApiUrl: string,
-  surfApiKey: string,
   {
     query,
-    numResults = 5,
+    num_results = 5,
   }: {
     query: string;
-    numResults?: number;
+    num_results?: number;
   },
-): Promise<WebSearchResult[]> => {
+): Promise<WebSearchResult> => {
   try {
     const response = await fetch(`${surfApiUrl}/search?q=${encodeURI(query)}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-      } as any,
+      },
     });
 
     if (!response.ok) {
@@ -65,11 +66,13 @@ export const executeWebSearch = async (
 
     const data: SurfSearchResponse = await response.json();
 
-    return data.results.slice(0, numResults).map((result) => ({
-      title: result.title,
-      url: result.url,
-      snippet: result.snippet.substring(0, 200) + '...',
-    }));
+    return {
+      result: data.results.slice(0, num_results).map((result) => ({
+        title: result.title,
+        url: result.url,
+        snippet: result.snippet.substring(0, 200) + '...',
+      })),
+    };
   } catch (error) {
     console.error('Web search error:', error);
     throw new Error('Failed to perform web search');
@@ -77,13 +80,13 @@ export const executeWebSearch = async (
 };
 
 export const formatSearchResults = async (
-  results: WebSearchResult[],
+  results: WebSearchResult,
 ): Promise<string> => {
-  if (results.length === 0) {
+  if (!results.result || results.result.length === 0) {
     return 'No search results found.';
   }
 
-  return results
+  return results.result
     .map((result, index) => {
       return `${index + 1}. **${result.title}**
    URL: ${result.url}
