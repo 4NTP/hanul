@@ -254,10 +254,27 @@ export class AIService {
         {
           role: 'system',
           content:
-            '다음 유저가 채팅한 내역을 토대로 적절한 제목을 생성하세요. 답변은 { "title": "제목" } 형식으로 반환하세요. 언어는 유저가 사용한 언어로 생성하세요. json format 의외에 다른 내용을 포함하면 안됩니다.',
+            '다음 유저가 채팅한 내역을 토대로 적절한 제목을 생성하세요. 제목은 유저가 사용한 언어로 생성하세요.',
         },
         { role: 'user', content: prompt },
       ],
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'data',
+          strict: true,
+          schema: {
+            type: 'object',
+            properties: {
+              title: {
+                type: 'string',
+                description: '제목',
+              },
+            },
+            required: ['title'],
+          },
+        },
+      },
     });
     let title: string | undefined;
     try {

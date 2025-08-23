@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@hanul/ui/components/button';
-import { Input } from '@hanul/ui/components/input';
+import { Textarea } from '@hanul/ui/components/textarea';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useLocale, useTranslations } from 'next-intl';
@@ -540,13 +540,23 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
         </div>
 
         <div className="border-t p-4 bg-background">
-          <div className="flex gap-2">
-            <Input
+          <div className="flex gap-2 items-end">
+            <Textarea
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               placeholder={t('input.placeholder')}
-              onKeyUp={(e) => e.key === 'Enter' && sendMessage()}
-              className="flex-1"
+              className="flex-1 max-h-48"
+              rows={3}
+              onKeyDown={(e) => {
+                if (
+                  e.key === 'Enter' &&
+                  !e.shiftKey &&
+                  !e.nativeEvent.isComposing
+                ) {
+                  e.preventDefault();
+                  sendMessage();
+                }
+              }}
             />
             <Button onClick={sendMessage} disabled={isStreaming}>
               {isStreaming ? t('sending') : t('send')}
