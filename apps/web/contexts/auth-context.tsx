@@ -1,5 +1,6 @@
 'use client';
 
+import router from 'next/router';
 import {
   createContext,
   useContext,
@@ -100,6 +101,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     setUser(null);
+
+    router.push(`/`);
   };
 
   return (

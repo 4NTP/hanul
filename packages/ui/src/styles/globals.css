@@ -126,6 +126,285 @@
   }
 }
 
+/* Landing animations */
+@keyframes gradient-x {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.animate-gradient-x {
+  background-size: 200% 200%;
+  animation: gradient-x 8s ease infinite;
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.animate-float-slow {
+  animation: float 6s ease-in-out infinite;
+}
+
+/* Card shine / tilt utilities */
+.card-shine {
+  position: relative;
+  overflow: hidden;
+}
+.card-shine::before {
+  content: '';
+  position: absolute;
+  inset: -150%;
+  background: conic-gradient(
+    from 180deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.12) 10%,
+    transparent 20%
+  );
+  transform: translateX(-50%) rotate(0deg);
+  transition: transform 800ms ease;
+}
+.card-shine:hover::before {
+  transform: translateX(0%) rotate(25deg);
+}
+.tilt-on-hover {
+  transition:
+    transform 400ms ease,
+    box-shadow 400ms ease;
+}
+.tilt-on-hover:hover {
+  transform: perspective(900px) rotateX(2deg) rotateY(-3deg) translateY(-2px);
+}
+
+/* Grid pattern background */
+.grid-pattern {
+  background-image:
+    radial-gradient(circle at 1px 1px, hsl(var(--border)) 1px, transparent 0),
+    radial-gradient(circle at 1px 1px, hsl(var(--border)) 1px, transparent 0);
+  background-size:
+    24px 24px,
+    24px 24px;
+  background-position:
+    0 0,
+    12px 12px;
+  mask-image: radial-gradient(ellipse at center, black 40%, transparent 70%);
+}
+
+/* Marquee */
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+.marquee {
+  white-space: nowrap;
+  overflow: hidden;
+}
+.marquee-track {
+  display: inline-block;
+  animation: marquee 20s linear infinite;
+}
+
+/* Gradient mesh background */
+@keyframes drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(2%, -2%, 0) scale(1.04);
+  }
+}
+
+.mesh {
+  position: absolute;
+  inset: -15% -15% -15% -15%;
+  filter: blur(56px);
+  pointer-events: none;
+}
+.mesh > span {
+  position: absolute;
+  border-radius: 9999px;
+  opacity: 0.18;
+  mix-blend-mode: screen;
+  animation: drift 16s ease-in-out infinite;
+}
+.mesh .m1 {
+  width: 38vw;
+  height: 38vw;
+  top: 6%;
+  left: 8%;
+  background: radial-gradient(
+    closest-side,
+    hsl(var(--chart-1) / 0.9),
+    transparent 60%
+  );
+}
+.mesh .m2 {
+  width: 32vw;
+  height: 32vw;
+  top: -4%;
+  right: 6%;
+  background: radial-gradient(
+    closest-side,
+    hsl(var(--chart-2) / 0.9),
+    transparent 60%
+  );
+  animation-delay: 0.6s;
+}
+.mesh .m3 {
+  width: 42vw;
+  height: 42vw;
+  bottom: -6%;
+  left: -2%;
+  background: radial-gradient(
+    closest-side,
+    hsl(var(--chart-3) / 0.85),
+    transparent 60%
+  );
+  animation-delay: 1.2s;
+}
+.mesh .m4 {
+  width: 30vw;
+  height: 30vw;
+  bottom: 8%;
+  right: 8%;
+  background: radial-gradient(
+    closest-side,
+    hsl(var(--chart-4) / 0.85),
+    transparent 60%
+  );
+  animation-delay: 1.8s;
+}
+
+/* Vignette */
+.vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    closest-side at 50% 50%,
+    transparent 60%,
+    rgba(0, 0, 0, 0.55) 115%
+  );
+  mix-blend-mode: multiply;
+  opacity: 0.35;
+}
+
+/* Aurora + twinkle background */
+@keyframes aurora {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-6%) rotate(10deg);
+  }
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.1;
+  }
+  50% {
+    opacity: 0.28;
+  }
+}
+
+.aurora {
+  position: absolute;
+  inset: -10% -10% -10% -10%;
+  filter: blur(44px);
+  pointer-events: none;
+}
+.aurora > span {
+  position: absolute;
+  border-radius: 9999px;
+  mix-blend-mode: screen;
+  opacity: 0.26;
+  animation: aurora 14s ease-in-out infinite;
+}
+.aurora .a1 {
+  width: 40vw;
+  height: 40vw;
+  top: 4%;
+  left: -6%;
+  background: radial-gradient(
+    closest-side,
+    hsl(var(--primary) / 0.6),
+    transparent 65%
+  );
+}
+.aurora .a2 {
+  width: 36vw;
+  height: 36vw;
+  top: -8%;
+  right: -4%;
+  background: radial-gradient(
+    closest-side,
+    hsl(var(--chart-2) / 0.6),
+    transparent 65%
+  );
+  animation-delay: 0.6s;
+}
+.aurora .a3 {
+  width: 42vw;
+  height: 42vw;
+  bottom: -6%;
+  left: -8%;
+  background: radial-gradient(
+    closest-side,
+    hsl(var(--chart-3) / 0.55),
+    transparent 65%
+  );
+  animation-delay: 1.2s;
+}
+.aurora .a4 {
+  width: 38vw;
+  height: 38vw;
+  bottom: 2%;
+  right: -6%;
+  background: radial-gradient(
+    closest-side,
+    hsl(var(--chart-4) / 0.5),
+    transparent 65%
+  );
+  animation-delay: 1.8s;
+}
+
+.twinkles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.twinkles::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(
+    hsl(var(--primary)) 0.6px,
+    transparent 0.9px
+  );
+  background-size: 3px 3px;
+  opacity: 0.12;
+  animation: twinkle 4.5s ease-in-out infinite;
+  mix-blend-mode: overlay;
+}
+
 /* Code highlighting styles */
 .hljs {
   display: block;

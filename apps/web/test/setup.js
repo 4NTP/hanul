@@ -59,7 +59,7 @@ jest.mock('next-intl', () => ({
       subhead:
         'Experience the future of automated assistance with our advanced AI agent platform.',
       ctaPrimary: 'Start with AI',
-      ctaSecondary: 'Explore Features',
+      // ctaSecondary: 'Explore Features',
       signInTitle: 'Welcome back',
       signInSub: 'Choose a provider to continue',
       withGoogle: 'Continue with Google',

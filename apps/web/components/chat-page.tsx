@@ -2,7 +2,14 @@
 
 import { Button } from '@hanul/ui/components/button';
 import { Textarea } from '@hanul/ui/components/textarea';
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+  useLayoutEffect,
+} from 'react';
 import { useToast } from '@hanul/ui/components/toast';
 import { useAuth } from '@/hooks/use-auth';
 import { useLocale, useTranslations } from 'next-intl';
@@ -54,16 +61,14 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
   const [mentionStart, setMentionStart] = useState<number | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
   const [inputScrollTop, setInputScrollTop] = useState(0);
+  const [overlayStyle, setOverlayStyle] = useState<React.CSSProperties>({});
   const { push } = useToast();
   const prevAgentsRef = useRef<SubAgentDto[] | null>(null);
 
-  let ignoreFirst = true;
-
   useEffect(() => {
-    if (!isAuthenticated && !ignoreFirst) {
+    if (!isAuthenticated) {
       router.push(`/`);
     }
-    ignoreFirst = false;
   }, [isAuthenticated, router]);
 
   const agentsQuery = useQuery({
@@ -317,8 +322,11 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
       // Support @word (Unicode letters/numbers/_/-.), avoid already converted mention: links
       out = out.replace(/@([\p{L}\p{N}_\-.]+)/gu, (_m, raw: string) => {
         const name = String(raw || '');
-        if (names.has(name.toLowerCase())) {
-          return `[${'@' + name}](mention:${name})`;
+        // underscores are treated as spaces when resolving to agent canonical name
+        const canonical = name.replace(/_/g, ' ');
+        if (names.has(canonical.toLowerCase())) {
+          // Keep visual as typed (with underscores), link to canonical with spaces
+          return `[${'@' + name}](mention:${canonical})`;
         }
         return '@' + name;
       });
@@ -354,10 +362,11 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
         out += escapeHtml(input.slice(last, idx));
       }
       const full = m[0];
-      const name = full.startsWith('@<') ? (m[1] || '').trim() : full.slice(1);
-      if (name && names.has(name.toLowerCase())) {
+      const raw = full.startsWith('@<') ? (m[1] || '').trim() : full.slice(1);
+      const canonical = full.startsWith('@<') ? raw : raw.replace(/_/g, ' ');
+      if (raw && names.has(canonical.toLowerCase())) {
         out += `<span class=\"inline-flex items-center rounded-sm bg-sky-100 text-sky-800 px-1 py-0.5\">@${escapeHtml(
-          name,
+          raw,
         )}</span>`;
       } else {
         out += escapeHtml(full);
@@ -369,10 +378,37 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
     return out.replace(/\n$/, '\n\u200b');
   }, [agentsQuery.data, escapeHtml, inputValue]);
 
+  useLayoutEffect(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const compute = () => {
+      const cs = window.getComputedStyle(ta);
+      setOverlayStyle({
+        fontFamily: cs.fontFamily,
+        fontSize: cs.fontSize,
+        fontWeight: cs.fontWeight as any,
+        letterSpacing: cs.letterSpacing,
+        lineHeight: cs.lineHeight,
+        paddingTop: parseFloat(cs.paddingTop) || undefined,
+        paddingRight: parseFloat(cs.paddingRight) || undefined,
+        paddingBottom: parseFloat(cs.paddingBottom) || undefined,
+        paddingLeft: parseFloat(cs.paddingLeft) || undefined,
+      });
+    };
+    compute();
+    const ro = new ResizeObserver(compute);
+    ro.observe(ta);
+    window.addEventListener('resize', compute);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', compute);
+    };
+  }, [textareaRef]);
+
   const filteredMentions = useMemo(() => {
     const list = (agentsQuery.data || []).filter((a) => !a.deletedAt);
     if (!mentionQuery) return list;
-    const q = mentionQuery.toLowerCase();
+    const q = mentionQuery.toLowerCase().replace(/_/g, ' ');
     return list.filter((a) => (a.name || '').toLowerCase().includes(q));
   }, [agentsQuery.data, mentionQuery]);
 
@@ -386,7 +422,9 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
       const el = textareaRef.current;
       const before = inputValue.slice(0, mentionStart);
       const after = inputValue.slice(el.selectionStart ?? inputValue.length);
-      const insertion = `@${chosen.name || 'unknown'} `;
+      const rawName = (chosen.name || 'unknown').trim();
+      const safeName = rawName.replace(/\s+/g, '_');
+      const insertion = `@${safeName} `;
       const nextVal = `${before}${insertion}${after}`;
       setInputValue(nextVal);
       setIsMentionOpen(false);
@@ -978,13 +1016,13 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
           <div className="flex gap-2 items-end">
             <div className="relative flex-1">
               <div
-                className="pointer-events-none absolute inset-0 whitespace-pre-wrap break-words text-sm text-transparent selection:bg-transparent"
+                className="hidden pointer-events-none absolute inset-0 whitespace-pre-wrap break-words text-sm text-transparent selection:bg-transparent"
                 aria-hidden
               >
                 <div
                   className="[&_*]:align-middle"
                   style={{
-                    font: 'inherit',
+                    ...overlayStyle,
                     whiteSpace: 'pre-wrap',
                     marginTop: -inputScrollTop,
                   }}
@@ -1058,17 +1096,66 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
                   const val = el.value;
                   const atIdx = val.lastIndexOf('@', caret - 1);
                   if (atIdx >= 0) {
-                    // ensure no whitespace between @ and caret
-                    const segment = val.slice(atIdx + 1, caret);
-                    if (/^[^\s@]{0,32}$/.test(segment)) {
-                      setIsMentionOpen(true);
-                      setMentionStart(atIdx);
-                      setMentionQuery(segment);
-                      // Only reset to first when query actually changed
-                      setMentionIndex((i) =>
-                        segment !== mentionQuery ? 0 : i,
-                      );
-                      return;
+                    const afterAt = val[atIdx + 1];
+                    const names = new Set(
+                      (agentsQuery.data || [])
+                        .map((a) => (a.name || '').toLowerCase())
+                        .filter((n) => n.length > 0),
+                    );
+                    // Bracketed mention @<name with spaces>
+                    if (afterAt === '<') {
+                      const closeIdx = val.indexOf('>', atIdx + 2);
+                      // Completed tag if '>' exists and caret is after it
+                      if (closeIdx !== -1 && caret > closeIdx) {
+                        setIsMentionOpen(false);
+                        setMentionQuery('');
+                        setMentionStart(null);
+                        return;
+                      }
+                      // If caret is inside bracket, suggest by inner segment
+                      const segment = val.slice(atIdx + 2, caret);
+                      // Basic guard against invalid chars
+                      if (/^[^<>@]{0,64}$/.test(segment)) {
+                        // Do not open if exact match
+                        if (
+                          segment.length > 0 &&
+                          names.has(segment.toLowerCase())
+                        ) {
+                          setIsMentionOpen(false);
+                          setMentionQuery('');
+                          setMentionStart(null);
+                          return;
+                        }
+                        setIsMentionOpen(true);
+                        setMentionStart(atIdx);
+                        setMentionQuery(segment);
+                        setMentionIndex((i) =>
+                          segment !== mentionQuery ? 0 : i,
+                        );
+                        return;
+                      }
+                    } else {
+                      // Simple mention @word
+                      const segment = val.slice(atIdx + 1, caret);
+                      if (/^[\p{L}\p{N}_\-.]{0,32}$/u.test(segment)) {
+                        // Do not open if exact match
+                        if (
+                          segment.length > 0 &&
+                          names.has(segment.toLowerCase())
+                        ) {
+                          setIsMentionOpen(false);
+                          setMentionQuery('');
+                          setMentionStart(null);
+                          return;
+                        }
+                        setIsMentionOpen(true);
+                        setMentionStart(atIdx);
+                        setMentionQuery(segment);
+                        setMentionIndex((i) =>
+                          segment !== mentionQuery ? 0 : i,
+                        );
+                        return;
+                      }
                     }
                   }
                   setIsMentionOpen(false);
