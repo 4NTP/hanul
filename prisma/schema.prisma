@@ -31,6 +31,7 @@ model Chat {
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
   histories ChatHistory[]
+  SubAgents SubAgent[]
 }
 
 model ChatHistory {
@@ -43,4 +44,13 @@ model ChatHistory {
   name       String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+}
+
+model SubAgent {
+  id     String @id @default(uuid()) @db.Uuid
+  prompt String
+  chat   Chat   @relation(fields: [chatId], references: [id])
+  chatId String @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
