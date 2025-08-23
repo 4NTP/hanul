@@ -26,7 +26,6 @@ export async function FindSubAgents(Db: DbService, chatId?: string) {
     orderBy: { createdAt: 'desc' },
     select: { id: true, name: true, prompt: true, createdAt: true },
   });
-  console.log(subAgents);
   const items = subAgents.map((s) => ({
     id: s.id,
     name: s.name || null,

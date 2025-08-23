@@ -26,10 +26,16 @@ export async function UpdateSubAgent(
   Db: DbService,
   { name, prompt }: { name: string; prompt: string },
 ) {
-  console.log(name, prompt);
-  const subAgent = await Db.subAgent.update({
-    where: { name: name }, // name 파라미터가 실제로는 id 값임
-    data: { prompt },
+  console.log(name);
+  const subAgent = await Db.subAgent.findUnique({
+    where: { id: name },
   });
-  return { subAgent };
+  if (!subAgent) {
+    throw new Error('SubAgent not found');
+  }
+  const result = await Db.subAgent.update({
+    where: { id: name },
+    data: { prompt: (subAgent.prompt += prompt) },
+  });
+  return { result };
 }

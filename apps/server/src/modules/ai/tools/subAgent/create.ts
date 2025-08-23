@@ -29,9 +29,9 @@ export async function CreateSubAgent(
   name: string,
   { prompt }: { prompt: string },
 ) {
-  console.log(chatId, name, prompt);
+  console.log(name, prompt);
   const subAgent = await Db.subAgent.upsert({
-    where: { name },
+    where: { name, deletedAt: null },
     update: { prompt },
     create: { prompt, name, chat: { connect: { id: chatId } } },
   });

@@ -11,9 +11,6 @@ export const availableTools = [
   // HTTP
   fetchTool,
 
-  // Think
-  // sequentialThinkingTool,
-
   // Web
   webReadTool,
   webSearchTool,

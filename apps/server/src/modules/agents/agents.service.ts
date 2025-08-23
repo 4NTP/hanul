@@ -71,15 +71,11 @@ export class AgentsService {
   }
 
   async deleteAgent(userId: string, id: string) {
-    const agent = await this.db.subAgent.findFirst({
-      where: { id, chat: { authorId: userId }, deletedAt: null },
-      select: { id: true },
+    const agent = await this.db.subAgent.delete({
+      where: { id },
     });
     if (!agent) throw new NotFoundException('Agent not found');
-    return await this.db.subAgent.update({
-      where: { id },
-      data: { deletedAt: new Date() },
-    });
+    return { result: 'ok' };
   }
 
   async getTrashedAgents(userId: string) {

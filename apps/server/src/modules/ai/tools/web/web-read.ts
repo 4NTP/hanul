@@ -29,7 +29,6 @@ export const executeWebRead = async (
         'Content-Type': 'application/json',
       },
     });
-    console.log('Web read response status:', response.status);
 
     if (!response.ok) {
       throw new Error(`Failed to fetch URL: ${response.statusText}`);
@@ -37,7 +36,6 @@ export const executeWebRead = async (
 
     return await response.json();
   } catch (error) {
-    console.log('Error fetching URL:', url);
     return null;
     // throw new Error(`Error fetching URL`);
   }

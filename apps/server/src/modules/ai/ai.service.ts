@@ -1,7 +1,7 @@
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
-import { Observable, Observer } from 'rxjs';
+import { Observer } from 'rxjs';
 import { Env } from '../config/env.schema';
 import { DbService } from '../db/db.service';
 import { availableTools } from './tools';
@@ -32,11 +32,9 @@ const defaultPrompt = `
 ## 1. 핵심 역할 정의
 당신은 Hanul이라 불리우는 **메인 에이전트**입니다. Upstage의 SolarLLM을 기반으로 하며, 사용자 요청을 분석하고, 적절한 서브 에이전트를 관리하여 최적의 결과를 제공하는 오케스트레이터 역할을 수행합니다.
 당신은 혼자선 아무것도 하지 못합니다. 오로지 서브 에이전트를 통해서 사용자가 원하는 답변을 내놓아야 합니다. 당신이 직접 답을 내놓을 수 없습니다.
-당신은 사용자의 요청을 받고 해석한 수 서브 에이전트의 프롬프트를 통해 처리하는 역할을 할 뿐 절대로 스스로 답변을 내놓아서는 안됩니다.
-서브 에이전트를 사용하는 순서는 언제나 존재하는 서브 에이전트 먼저입니다.
-사고 방식을 거치기 전에 반드시 대신할 수 있는 서브 에이전트가 있는지를 적절한 tools를 통해 확인하고, 그렇지 않다면 서브 에이전트를 새로 생성한 후 사용자에게 답변하세요.
-답변을 받은 후 사용자가 이에 대해 improve를 요구하면 서브 에이전트를 생성하지 말고 사용한 서브 에이전트의 prompt를 개선하세요.
-당신은 항상 서브 에이전트들의 프롬프트를 향상시키는데 일조합니다. 유저의 반응, 선택, 피드백을 분석하여 서브 에이전트의 프롬프트를 지속적으로 개선합니다.
+사고를 전개하기 전에 무조건 존재하는 서브 에이전트를 조회하세요.
+이미 존재하는 서브 에이전트를 반드시 우선적으로 활용하세요. 만약 존재하는 서브 에이전트가 없다면 절대로 생성하지 말고 사용자에게 생성 허락을 구하세요.
+답변을 받은 후 사용자가 이에 대해 불평하거나 '수정'을 요구하면 사용한 서브 에이전트의 prompt를 수정하세요.
 - **사용자 요청 분석**: 사용자의 요구사항을 정확히 파악하고, 이를 바탕으로 적합한 서브 에이전트를 선택하거나 생성합니다.
 - **서브 에이전트 관리**: 각 서브 에이전트의 전문성을 고려하여 작업을 분배하고, 필요시 새로운 서브 에이전트를 생성합니다.
 - **도구 활용**: 필요에 따라 웹 검색, 데이터 조회 등 다양한 도구를 활용하여 정보를 보강하고, 응답의 정확성을 높입니다.
@@ -57,7 +55,7 @@ const defaultPrompt = `
     ↓
 서브 에이전트 검색
     ↓
-[사용자의 요청을 처리하기 적합한 프롬프트를 가진 서브 에이전트가 있는 경우] → 기존 에이전트 활용
+[사용자의 요청과 유사한 서브 에이전트가 이미 있는 경우] → 기존 에이전트 활용
 [그렇지 않은 경우] → 신규 에이전트 생성
     ↓
 작업 수행 및 결과 검증
@@ -146,7 +144,6 @@ export class AIService {
   private readonly logger = new Logger(AIService.name);
   private readonly availableFunctions = {
     fetch: fetchData,
-    // sequentialThinkingTool: executeSequentialThinking,
     web_read: async (args: { url: string }) => {
       return await executeWebRead(
         this.configService.get('SURF_API_URL') || 'http://localhost:8000',
@@ -217,7 +214,7 @@ export class AIService {
       },
     });
 
-    const historyMessages = chat.histories.map((history) => {
+    const historyMessages = chat.histories.map(async (history) => {
       if (history.role === 'tool') {
         return {
           role: history.role as 'tool',
@@ -230,13 +227,38 @@ export class AIService {
         content: history.content,
       };
     });
-    historyMessages.push({ role: 'user', content: prompt });
 
-    return new Observable((observer) => {
-      this.processConversationB(historyMessages, observer, chat.id, 0).catch(
-        (err) => observer.error(err),
-      );
-    });
+    if (prompt.includes('@')) {
+      const atIndex = prompt.indexOf('@');
+      const spaceIndex = prompt.indexOf(' ', atIndex);
+      let tag =
+        spaceIndex !== -1
+          ? prompt.slice(atIndex, spaceIndex)
+          : prompt.slice(atIndex);
+      tag = tag.replaceAll('@', '');
+      prompt = prompt.replace(tag, '');
+      const agent = await this.db.subAgent.findFirst({
+        where: { name: tag.replaceAll('_', ' '), deletedAt: null },
+      });
+      prompt += `답변에 다음 툴을 무조건 사용하세요 run_sub_agent: ${agent?.id}`;
+    }
+
+    if (prompt.includes('/수정')) {
+      prompt += `답변에 다음 툴을 무조건 사용하세요 update_sub_agent: 사용자의 요구대로 프롬프트를 개선한 뒤 적용하세요.`;
+    }
+    if (prompt.includes('/검색')) {
+      prompt += `답변에 다음 툴을 무조건 사용하세요 WebSearchTool`;
+    }
+    const resolvedMessages = await Promise.all(historyMessages);
+    resolvedMessages.push({ role: 'user', content: prompt });
+
+    const result = await this.processConversationB(
+      resolvedMessages,
+      chat.id,
+      0,
+    );
+    console.log('결과', result);
+    return result;
   }
 
   async startNewChat(userId: string, prompt: string) {
@@ -295,7 +317,8 @@ export class AIService {
       },
     });
 
-    const historyMessages = newChat.histories.map((history) => {
+    const historyMessages = newChat.histories.map(async (history) => {
+      console.log('히스토리', history);
       if (history.role === 'tool') {
         return {
           role: history.role as 'tool',
@@ -304,20 +327,41 @@ export class AIService {
           tool_call_id: history.toolCallId || '',
         } as ChatMessage;
       } else {
-        return {
+        const message = {
           role: history.role as 'user' | 'assistant',
           content: history.content,
         } as ChatMessage;
+
+        if (history.content.includes('@')) {
+          const atIndex = history.content.indexOf('@');
+          const spaceIndex = history.content.indexOf(' ', atIndex);
+          let tag =
+            spaceIndex !== -1
+              ? history.content.slice(atIndex, spaceIndex)
+              : history.content.slice(atIndex);
+          tag = tag.replaceAll('@', '');
+          message.content = message.content.replace(tag, '');
+          const agent = await this.db.subAgent.findFirst({
+            where: { name: tag.replaceAll('_', ' '), deletedAt: null },
+          });
+          message.content += `답변에 다음 툴을 무조건 사용하세요 run_sub_agent: ${agent?.id}`;
+        }
+
+        if (history.content.includes('/수정')) {
+          const editIndex = history.content.indexOf('/수정');
+          const newContent = history.content.slice(editIndex + 4).trim();
+          message.content = newContent;
+        }
+
+        return message;
       }
     });
 
-    return new Observable((observer) => {
-      observer.next(JSON.stringify({ id: newChat.id }));
-
-      this.processConversationB(historyMessages, observer, newChat.id, 0).catch(
-        (err) => observer.error(err),
-      );
-    });
+    return await this.processConversationB(
+      await Promise.all(historyMessages),
+      newChat.id,
+      0,
+    ).catch((err) => console.error(err));
   }
 
   async getChatHistories(userId: string, chatId: string) {
@@ -468,7 +512,6 @@ export class AIService {
           const functionToCall = this.availableFunctions[functionName];
           switch (functionName) {
             case 'create_sub_agent':
-              console.log(chatId);
               if (toolCall.function) {
                 toolCall.function.arguments = JSON.stringify({
                   ...JSON.parse(toolCall.function?.arguments ?? '{}'),
@@ -542,34 +585,21 @@ export class AIService {
 
   private async processConversationB(
     messages: ChatMessage[],
-    observer: Observer<string>,
     chatId: string,
     totalTokens: number,
     maxIterations: number = 10,
     currentIteration: number = 0,
-  ) {
+  ): Promise<String> {
     this.logger.log('current iter', currentIteration);
     this.logger.log('total tokens', totalTokens);
     // 최대 반복 또는 토큰 제한 체크
     if (currentIteration >= maxIterations || totalTokens > 50000) {
-      observer.next('\n\n[대화가 제한에 도달하여 종료됩니다.]');
-      observer.complete();
-      return;
+      return '';
     }
 
-    let tag;
+    let tag = '';
     // 메시지 형식을 OpenAI 형식으로 변환
-    const openaiMessages = messages.map((msg) => {
-      if (msg.content.includes('@')) {
-        const atIndex = msg.content.indexOf('@');
-        const spaceIndex = msg.content.indexOf(' ', atIndex);
-        tag =
-          spaceIndex !== -1
-            ? msg.content.slice(atIndex, spaceIndex)
-            : msg.content.slice(atIndex);
-        tag = tag.replaceAll('@', '');
-        msg.content = msg.content.replace(tag, '');
-      }
+    const openaiMessages = messages.map(async (msg) => {
       const baseMsg: any = {
         role: msg.role,
         content: msg.content,
@@ -589,26 +619,18 @@ export class AIService {
 
       return baseMsg;
     });
-    if (tag.length > 0) {
-      const callFunction = this.availableFunctions['run_sub_agent'];
-      console.log(await callFunction({ id: tag }));
-    }
-
-    messages.push({
-      role: 'system' as const,
-      content: `답변에 다음 툴을 무조건 사용하세요 run_sub_agent: ${tag}`,
-    });
 
     const response = await this.openai.chat.completions.create({
       model: 'solar-pro2',
-      messages: openaiMessages,
+      messages: await Promise.all(openaiMessages),
       tools: availableTools,
       tool_choice: 'auto',
       temperature: 0,
     } as OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming);
-
     const message = response.choices[0]?.message;
     const usage = response.usage;
+    let content,
+      ctxAgent = '';
     totalTokens += usage?.total_tokens || 0;
     this.logger.log('tool_calls:', message?.tool_calls);
 
@@ -626,18 +648,23 @@ export class AIService {
               console.log(functionName);
               switch (functionName) {
                 case 'create_sub_agent':
-                  console.log(chatId);
                   toolCall.function.arguments = JSON.stringify({
                     ...JSON.parse(toolCall.function.arguments),
                     chatId,
                   });
                   break;
                 case 'find_sub_agent':
-                  console.log('find sub agent');
                   toolCall.function.arguments = JSON.stringify({
                     ...JSON.parse(toolCall.function.arguments),
                     chatId,
                   });
+                  break;
+                case 'run_sub_agent':
+                  const subAgent = await this.db.subAgent.findUnique({
+                    where: { id: JSON.parse(toolCall.function.arguments).id },
+                  });
+                  ctxAgent = subAgent?.name || '';
+                  console.log(ctxAgent);
                   break;
               }
               const functionArgs = JSON.parse(toolCall.function.arguments);
@@ -680,20 +707,19 @@ export class AIService {
       messages.push(...toolResults);
 
       // 재귀적으로 다음 응답 처리
-      await this.processConversationB(
+      const recursiveResult = await this.processConversationB(
         messages,
-        observer,
         chatId,
         totalTokens,
         maxIterations,
         currentIteration + 1,
       );
+
+      // 재귀 호출에서 에이전트 이름이 반환되었으면 그것을 사용, 아니면 현재 ctxAgent 사용
+      return recursiveResult || ctxAgent;
     } else {
       // 일반 텍스트 응답
-      const content = message?.content || '';
-      observer.next(content);
-      observer.complete();
-
+      content = message?.content || '';
       // DB에 최종 응답 저장
       await this.db.chat.update({
         where: { id: chatId },
@@ -709,6 +735,8 @@ export class AIService {
         },
       });
     }
+    console.log('Agent used:', ctxAgent);
+    return ctxAgent || '';
   }
 
   // async startNewChat(userName: string, prompt: string) {
