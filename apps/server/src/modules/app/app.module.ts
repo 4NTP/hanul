@@ -15,6 +15,7 @@ import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
 import { LoggerMiddleware } from '@/common/logger.middleware';
 import { envSchema } from '../config/env.schema';
 import { AIModule } from '../ai/ai.module';
+import { AgentsModule } from '../agents/agents.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { AIModule } from '../ai/ai.module';
     TokensModule,
     UsersModule,
     AIModule,
+    AgentsModule,
   ],
   controllers: [AppController],
   providers: [
