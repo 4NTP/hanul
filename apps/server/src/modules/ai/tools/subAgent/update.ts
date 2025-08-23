@@ -24,10 +24,11 @@ export const subAgentUpdateTool = {
 
 export async function UpdateSubAgent(
   Db: DbService,
-  { id, prompt }: { id: string; prompt: string },
+  { name, prompt }: { name: string; prompt: string },
 ) {
+  console.log(name, prompt);
   const subAgent = await Db.subAgent.update({
-    where: { id },
+    where: { name: name }, // name 파라미터가 실제로는 id 값임
     data: { prompt },
   });
   return { subAgent };

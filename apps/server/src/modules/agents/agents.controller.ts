@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  UseGuards,
+  Patch,
+  Body,
+  Delete,
+} from '@nestjs/common';
 import { AgentsService } from './agents.service';
 import {
   UpdateAgentPromptRequestDto,
@@ -47,5 +55,10 @@ export class AgentsController {
       'Agent prompt updated',
       await this.agentsService.updateAgentPrompt(user.sub, id, body.prompt),
     );
+  }
+
+  @Delete(':id')
+  async deleteAgent(@Param('id') id: string) {
+    return await this.agentsService.deleteAgent(id);
   }
 }

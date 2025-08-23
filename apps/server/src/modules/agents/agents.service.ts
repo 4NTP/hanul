@@ -7,7 +7,7 @@ export class AgentsService {
 
   async getAgentById(userId: string, id: string) {
     return await this.db.subAgent.findUnique({
-      where: { id, chat: { authorId: userId } },
+      where: { id, chat: { authorId: userId }, deletedAt: null },
       include: {
         updateHistories: {
           orderBy: {
@@ -20,7 +20,7 @@ export class AgentsService {
 
   async getAllAgents(userId: string) {
     return await this.db.subAgent.findMany({
-      where: { chat: { authorId: userId } },
+      where: { chat: { authorId: userId }, deletedAt: null },
       include: {
         chat: {
           select: {
@@ -38,7 +38,7 @@ export class AgentsService {
 
   async getRecentChangedAgent(userId: string) {
     return await this.db.subAgent.findFirst({
-      where: { chat: { authorId: userId } },
+      where: { chat: { authorId: userId }, deletedAt: null },
       orderBy: {
         updatedAt: 'desc',
       },
@@ -55,7 +55,7 @@ export class AgentsService {
   async updateAgentPrompt(userId: string, id: string, prompt: string) {
     console.log('updateAgentPrompt', userId, id, prompt);
     return await this.db.subAgent.update({
-      where: { id, chat: { authorId: userId } },
+      where: { id, chat: { authorId: userId }, deletedAt: null },
       data: { prompt },
       include: {
         updateHistories: {
@@ -67,6 +67,13 @@ export class AgentsService {
           },
         },
       },
+    });
+  }
+
+  async deleteAgent(id: string) {
+    return await this.db.subAgent.update({
+      where: { id },
+      data: { deletedAt: new Date() },
     });
   }
 }

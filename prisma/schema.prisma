@@ -54,6 +54,7 @@ model SubAgent {
   chatId          String                  @db.Uuid
   createdAt       DateTime                @default(now())
   updatedAt       DateTime                @updatedAt
+  deletedAt       DateTime?               
   updateHistories SubAgentUpdateHistory[]
 }
 
