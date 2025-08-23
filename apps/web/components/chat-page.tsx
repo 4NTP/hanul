@@ -3,6 +3,7 @@
 import { Button } from '@hanul/ui/components/button';
 import { Textarea } from '@hanul/ui/components/textarea';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useToast } from '@hanul/ui/components/toast';
 import { useAuth } from '@/hooks/use-auth';
 import { useLocale, useTranslations } from 'next-intl';
 import { useRouter, useParams } from 'next/navigation';
@@ -47,12 +48,23 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
   );
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const [isMentionOpen, setIsMentionOpen] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [mentionStart, setMentionStart] = useState<number | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const [inputScrollTop, setInputScrollTop] = useState(0);
+  const { push } = useToast();
+  const prevAgentsRef = useRef<SubAgentDto[] | null>(null);
+
+  let ignoreFirst = true;
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      router.push(`/${locale}`);
+    if (!isAuthenticated && !ignoreFirst) {
+      router.push(`/`);
     }
-  }, [isAuthenticated, locale, router]);
+    ignoreFirst = false;
+  }, [isAuthenticated, router]);
 
   const agentsQuery = useQuery({
     queryKey: ['agents'],
@@ -119,18 +131,37 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
       em: ({ children }: { children: React.ReactNode }) => (
         <em className="italic">{children}</em>
       ),
-      a: ({ children, href }: { children: React.ReactNode; href?: string }) => (
-        <a
-          href={href}
-          className="text-blue-500 hover:text-blue-700 underline"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          {children}
-        </a>
-      ),
+      a: ({ children, href }: { children: React.ReactNode; href?: string }) => {
+        if (href && href.startsWith('mention:')) {
+          const name = href.slice('mention:'.length);
+          return (
+            <span
+              onClick={() => {
+                setIsMentionOpen(true);
+                setMentionQuery(name);
+                setMentionIndex(0);
+                setTimeout(() => textareaRef.current?.focus(), 0);
+              }}
+              className="inline-flex cursor-pointer items-center rounded-sm bg-sky-100 text-sky-800 px-1.5 py-0.5 hover:bg-sky-200"
+              title={`@${name}`}
+            >
+              {children}
+            </span>
+          );
+        }
+        return (
+          <a
+            href={href}
+            className="text-blue-500 hover:text-blue-700 underline"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {children}
+          </a>
+        );
+      },
     } as const;
-  }, []);
+  }, [setIsMentionOpen, setMentionQuery]);
 
   const parseThinkSegments = useCallback((text: string) => {
     const segments: { type: 'think' | 'text'; content: string }[] = [];
@@ -163,6 +194,13 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
     }
     return segments;
   }, []);
+
+  const pushToast = useCallback(
+    (title: string, description: string | undefined, onClick?: () => void) => {
+      push({ title, description, onClick });
+    },
+    [push],
+  );
 
   const renderMessageText = useCallback(
     (keyPrefix: string, text: string) => {
@@ -257,6 +295,110 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
       return <div className="space-y-2">{items.reverse()}</div>;
     },
     [t],
+  );
+
+  const transformMentions = useCallback(
+    (text: string) => {
+      const names = new Set(
+        (agentsQuery.data || [])
+          .map((a) => (a.name || '').toLowerCase())
+          .filter((n) => n.length > 0),
+      );
+      let out = text;
+      // Support @<name with spaces>
+      out = out.replace(/@<([^>]+)>/g, (_m, raw: string) => {
+        const name = String(raw || '').trim();
+        if (!name) return _m;
+        if (names.has(name.toLowerCase())) {
+          return `[${'@' + name}](mention:${name})`;
+        }
+        return _m;
+      });
+      // Support @word (Unicode letters/numbers/_/-.), avoid already converted mention: links
+      out = out.replace(/@([\p{L}\p{N}_\-.]+)/gu, (_m, raw: string) => {
+        const name = String(raw || '');
+        if (names.has(name.toLowerCase())) {
+          return `[${'@' + name}](mention:${name})`;
+        }
+        return '@' + name;
+      });
+      return out;
+    },
+    [agentsQuery.data],
+  );
+
+  const escapeHtml = useCallback(
+    (s: string) =>
+      s
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;'),
+    [],
+  );
+
+  const buildHighlightedInputHtml = useCallback(() => {
+    const names = new Set(
+      (agentsQuery.data || [])
+        .map((a) => (a.name || '').toLowerCase())
+        .filter((n) => n.length > 0),
+    );
+    const pattern = /@<([^>]+)>|@[\p{L}\p{N}_\-.]+/gu;
+    const input = inputValue;
+    let last = 0;
+    let out = '';
+    for (const m of input.matchAll(pattern)) {
+      const idx = m.index ?? 0;
+      if (idx > last) {
+        out += escapeHtml(input.slice(last, idx));
+      }
+      const full = m[0];
+      const name = full.startsWith('@<') ? (m[1] || '').trim() : full.slice(1);
+      if (name && names.has(name.toLowerCase())) {
+        out += `<span class=\"inline-flex items-center rounded-sm bg-sky-100 text-sky-800 px-1 py-0.5\">@${escapeHtml(
+          name,
+        )}</span>`;
+      } else {
+        out += escapeHtml(full);
+      }
+      last = idx + full.length;
+    }
+    if (last < input.length) out += escapeHtml(input.slice(last));
+    // Ensure empty line to preserve height when input ends with newline
+    return out.replace(/\n$/, '\n\u200b');
+  }, [agentsQuery.data, escapeHtml, inputValue]);
+
+  const filteredMentions = useMemo(() => {
+    const list = (agentsQuery.data || []).filter((a) => !a.deletedAt);
+    if (!mentionQuery) return list;
+    const q = mentionQuery.toLowerCase();
+    return list.filter((a) => (a.name || '').toLowerCase().includes(q));
+  }, [agentsQuery.data, mentionQuery]);
+
+  const selectMentionByIndex = useCallback(
+    (index: number) => {
+      const list = filteredMentions;
+      if (list.length === 0) return;
+      const i = Math.max(0, Math.min(index, list.length - 1));
+      const chosen = list[i]!;
+      if (!textareaRef.current || mentionStart == null) return;
+      const el = textareaRef.current;
+      const before = inputValue.slice(0, mentionStart);
+      const after = inputValue.slice(el.selectionStart ?? inputValue.length);
+      const insertion = `@${chosen.name || 'unknown'} `;
+      const nextVal = `${before}${insertion}${after}`;
+      setInputValue(nextVal);
+      setIsMentionOpen(false);
+      setMentionQuery('');
+      setMentionStart(null);
+      setTimeout(() => {
+        const pos = (before + insertion).length;
+        el.setSelectionRange(pos, pos);
+        el.focus();
+      }, 0);
+    },
+    [filteredMentions, inputValue, mentionStart],
   );
 
   const mergeConsecutiveAI = useCallback((list: Message[]): Message[] => {
@@ -452,6 +594,41 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
         if (detailId) {
           loadChatDetailMutation.mutate(detailId);
         }
+
+        // Refresh Sub Agents and toast on changes
+        try {
+          const previous = (agentsQuery.data || []) as SubAgentDto[];
+          prevAgentsRef.current = previous;
+          const res = await agentsQuery.refetch();
+          const current = (res.data || []) as SubAgentDto[];
+          const prevMap = new Map(previous.map((a) => [a.id, a]));
+          // Detect creations
+          const created = current.filter((a) => !prevMap.has(a.id));
+          // Detect prompt updates
+          const updated = current.filter((a) => {
+            const prev = prevMap.get(a.id);
+            return prev && prev.prompt !== a.prompt;
+          });
+          if (created.length > 0 || updated.length > 0) {
+            const mkName = (a: SubAgentDto) => a.name || t('untitled');
+            created.forEach((a) =>
+              pushToast(
+                t('agentCreatedTitle'),
+                t('agentCreated', { name: mkName(a) }),
+                () => setSelectedAgentId(a.id),
+              ),
+            );
+            updated.forEach((a) =>
+              pushToast(
+                t('agentUpdatedTitle'),
+                t('agentUpdated', { name: mkName(a) }),
+                () => setSelectedAgentId(a.id),
+              ),
+            );
+          }
+        } catch (_) {
+          // ignore toast errors
+        }
       }
     },
   });
@@ -487,6 +664,7 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
 
   return (
     <div className="flex h-[calc(100svh-3.5rem)]">
+      {/* Toaster provided globally in ClientProviders */}
       {/* Desktop sidebar */}
       <aside className="w-64 border-r overflow-y-auto p-3 hidden md:block">
         <div className="mb-4">
@@ -501,19 +679,35 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
               </div>
             )}
             {(agentsQuery.data || []).map((agent) => (
-              <button
-                key={agent.id}
-                onClick={() => setSelectedAgentId(agent.id)}
-                className={`w-full text-left rounded-md px-3 py-2 transition-colors ${selectedAgentId === agent.id ? 'bg-accent' : 'hover:bg-muted'}`}
-              >
-                <div className="text-sm font-medium truncate">
-                  {agent.name || t('untitled')}
-                </div>
-                <div className="text-xs text-muted-foreground truncate">
-                  {agent.prompt.replace(/\s+/g, ' ').slice(0, 80)}
-                  {agent.prompt.length > 80 ? '…' : ''}
-                </div>
-              </button>
+              <div key={agent.id} className="relative">
+                <button
+                  onClick={() => setSelectedAgentId(agent.id)}
+                  className={`w-full text-left rounded-md px-3 py-2 transition-colors ${selectedAgentId === agent.id ? 'bg-accent' : 'hover:bg-muted'}`}
+                >
+                  <div className="text-sm font-medium truncate">
+                    {agent.name || t('untitled')}
+                  </div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {agent.prompt.replace(/\s+/g, ' ').slice(0, 80)}
+                    {agent.prompt.length > 80 ? '…' : ''}
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!confirm(t('confirmDelete'))) return;
+                    agentsAPI
+                      .delete(agent.id)
+                      .then(() => agentsQuery.refetch());
+                  }}
+                  className="absolute right-1.5 top-1.5 sm:right-2 sm:top-2 z-10 inline-flex items-center justify-center w-10 h-10 sm:w-8 sm:h-8 rounded-md text-base sm:text-sm text-muted-foreground hover:text-destructive hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  title={t('delete')}
+                  aria-label={t('delete')}
+                >
+                  ×
+                </button>
+              </div>
             ))}
           </div>
         </div>
@@ -609,7 +803,9 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
                   <div className="text-sm">
                     {renderMessageText(
                       message.id,
-                      message.text.replace(/^\[sub:[^\]]+\]\s*/, ''),
+                      transformMentions(
+                        message.text.replace(/^\[sub:[^\]]+\]\s*/, ''),
+                      ),
                     )}
                   </div>
                 </div>
@@ -630,7 +826,10 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
                 </div>
                 <div className="max-w-[85%] sm:max-w-lg md:max-w-xl lg:max-w-2xl rounded-lg px-4 py-2 bg-muted">
                   <div className="text-sm">
-                    {renderMessageText('stream', currentResponse)}
+                    {renderMessageText(
+                      'stream',
+                      transformMentions(currentResponse),
+                    )}
                     <span className="animate-pulse">▋</span>
                   </div>
                 </div>
@@ -673,19 +872,35 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
                       </div>
                     )}
                     {(agentsQuery.data || []).map((agent) => (
-                      <button
-                        key={agent.id}
-                        onClick={() => setSelectedAgentId(agent.id)}
-                        className={`w-full text-left rounded-md px-3 py-2 transition-colors ${selectedAgentId === agent.id ? 'bg-accent' : 'hover:bg-muted'}`}
-                      >
-                        <div className="text-sm font-medium truncate">
-                          {agent.name || t('untitled')}
-                        </div>
-                        <div className="text-xs text-muted-foreground truncate">
-                          {agent.prompt.replace(/\s+/g, ' ').slice(0, 80)}
-                          {agent.prompt.length > 80 ? '…' : ''}
-                        </div>
-                      </button>
+                      <div key={agent.id} className="relative">
+                        <button
+                          onClick={() => setSelectedAgentId(agent.id)}
+                          className={`w-full text-left rounded-md px-3 py-2 transition-colors ${selectedAgentId === agent.id ? 'bg-accent' : 'hover:bg-muted'}`}
+                        >
+                          <div className="text-sm font-medium truncate">
+                            {agent.name || t('untitled')}
+                          </div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {agent.prompt.replace(/\s+/g, ' ').slice(0, 80)}
+                            {agent.prompt.length > 80 ? '…' : ''}
+                          </div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!confirm(t('confirmDelete'))) return;
+                            agentsAPI
+                              .delete(agent.id)
+                              .then(() => agentsQuery.refetch());
+                          }}
+                          className="absolute right-1.5 top-1.5 z-10 inline-flex items-center justify-center w-10 h-10 rounded-md text-base text-muted-foreground hover:text-destructive hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          title={t('delete')}
+                          aria-label={t('delete')}
+                        >
+                          ×
+                        </button>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -761,24 +976,134 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
 
         <div className="border-t p-3 sm:p-4 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="flex gap-2 items-end">
-            <Textarea
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              placeholder={t('input.placeholder')}
-              className="flex-1 max-h-48"
-              rows={3}
-              onKeyDown={(e) => {
-                if (
-                  e.key === 'Enter' &&
-                  !e.shiftKey &&
-                  !e.nativeEvent.isComposing
-                ) {
-                  e.preventDefault();
-                  sendMessage();
-                }
-              }}
-              onFocus={() => setTimeout(() => scrollToBottom(), 100)}
-            />
+            <div className="relative flex-1">
+              <div
+                className="pointer-events-none absolute inset-0 whitespace-pre-wrap break-words text-sm text-transparent selection:bg-transparent"
+                aria-hidden
+              >
+                <div
+                  className="[&_*]:align-middle"
+                  style={{
+                    font: 'inherit',
+                    whiteSpace: 'pre-wrap',
+                    marginTop: -inputScrollTop,
+                  }}
+                  dangerouslySetInnerHTML={{
+                    __html: buildHighlightedInputHtml(),
+                  }}
+                />
+              </div>
+              <Textarea
+                ref={textareaRef}
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                placeholder={t('input.placeholder')}
+                className="relative bg-transparent w-full max-h-48"
+                rows={3}
+                onKeyDown={(e) => {
+                  // Mention navigation
+                  if (isMentionOpen) {
+                    if (e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      setMentionIndex(
+                        (i) => (i + 1) % Math.max(1, filteredMentions.length),
+                      );
+                      return;
+                    }
+                    if (e.key === 'ArrowUp') {
+                      e.preventDefault();
+                      setMentionIndex(
+                        (i) =>
+                          (i - 1 + Math.max(1, filteredMentions.length)) %
+                          Math.max(1, filteredMentions.length),
+                      );
+                      return;
+                    }
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      selectMentionByIndex(mentionIndex);
+                      return;
+                    }
+                    if (e.key === 'Tab') {
+                      e.preventDefault();
+                      selectMentionByIndex(mentionIndex);
+                      return;
+                    }
+                    if (e.key === 'Escape') {
+                      setIsMentionOpen(false);
+                    }
+                  }
+                  if (
+                    e.key === 'Enter' &&
+                    !e.shiftKey &&
+                    !e.nativeEvent.isComposing
+                  ) {
+                    e.preventDefault();
+                    sendMessage();
+                  }
+                }}
+                onKeyUp={(e) => {
+                  // Ignore nav/commit keys so Arrow/Enter/Tab don't reset selection
+                  if (
+                    isMentionOpen &&
+                    (e.key === 'ArrowDown' ||
+                      e.key === 'ArrowUp' ||
+                      e.key === 'Enter' ||
+                      e.key === 'Tab')
+                  ) {
+                    return;
+                  }
+                  const el = e.currentTarget;
+                  const caret = el.selectionStart ?? 0;
+                  const val = el.value;
+                  const atIdx = val.lastIndexOf('@', caret - 1);
+                  if (atIdx >= 0) {
+                    // ensure no whitespace between @ and caret
+                    const segment = val.slice(atIdx + 1, caret);
+                    if (/^[^\s@]{0,32}$/.test(segment)) {
+                      setIsMentionOpen(true);
+                      setMentionStart(atIdx);
+                      setMentionQuery(segment);
+                      // Only reset to first when query actually changed
+                      setMentionIndex((i) =>
+                        segment !== mentionQuery ? 0 : i,
+                      );
+                      return;
+                    }
+                  }
+                  setIsMentionOpen(false);
+                  setMentionQuery('');
+                  setMentionStart(null);
+                }}
+                onScroll={(e) => setInputScrollTop(e.currentTarget.scrollTop)}
+                onFocus={() => setTimeout(() => scrollToBottom(), 100)}
+              />
+            </div>
+            {isMentionOpen && filteredMentions.length > 0 && (
+              <div className="absolute bottom-20 left-4 right-4 sm:left-4 sm:right-auto z-50 w-auto sm:w-72 max-h-60 overflow-y-auto rounded-md border bg-popover text-popover-foreground shadow-md">
+                {filteredMentions.map((a, idx) => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    className={`flex w-full items-center justify-between px-3 py-2 text-sm ${
+                      idx === mentionIndex % filteredMentions.length
+                        ? 'bg-sky-100 text-sky-900 dark:bg-sky-900/40 dark:text-sky-100'
+                        : 'hover:bg-muted'
+                    }`}
+                    onMouseEnter={() => setMentionIndex(idx)}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      selectMentionByIndex(idx);
+                    }}
+                  >
+                    <span className="truncate">@{a.name || t('untitled')}</span>
+                    <span className="ml-2 text-xs text-muted-foreground truncate max-w-32">
+                      {a.prompt.replace(/\s+/g, ' ').slice(0, 28)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
             <Button onClick={sendMessage} disabled={isStreaming}>
               {isStreaming ? t('sending') : t('send')}
             </Button>

@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from 'next-themes';
 import { AuthProvider } from '@/contexts/auth-context';
+import { Toaster } from '@hanul/ui/components/toast';
 
 function makeQueryClient() {
   return new QueryClient({
@@ -40,7 +41,9 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
         disableTransitionOnChange
         enableColorScheme
       >
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <Toaster>{children}</Toaster>
+        </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

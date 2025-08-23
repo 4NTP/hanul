@@ -58,7 +58,8 @@ export class AgentsController {
   }
 
   @Delete(':id')
-  async deleteAgent(@Param('id') id: string) {
-    return await this.agentsService.deleteAgent(id);
+  @UseGuards(TokensGuard)
+  async deleteAgent(@Param('id') id: string, @CurrentUser() user) {
+    return await this.agentsService.deleteAgent(user.sub, id);
   }
 }
