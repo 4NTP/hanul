@@ -1,16 +1,16 @@
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
-import { Observable, Observer } from 'rxjs';
+import { delay, Observable, Observer } from 'rxjs';
 import { Env } from '../config/env.schema';
 import { DbService } from '../db/db.service';
 import { availableTools } from './tools';
 import { fetchData } from './tools/http/fetch';
 import { CreateSubAgent } from './tools/subAgent/create';
+import { FindSubAgents } from './tools/subAgent/find';
 import { executeSequentialThinking } from './tools/think/sequential-thinking';
 import { executeWebRead } from './tools/web/web-read';
 import { executeWebSearch } from './tools/web/web-search';
-import { FindSubAgents } from './tools/subAgent/find';
 
 type ChatMessage = {
   role: 'user' | 'assistant' | 'tool' | 'system';
@@ -155,7 +155,7 @@ export class AIService {
   private readonly logger = new Logger(AIService.name);
   private readonly availableFunctions = {
     fetch: fetchData,
-    sequentialThinkingTool: executeSequentialThinking,
+    // sequentialThinkingTool: executeSequentialThinking,
     web_read: async (args: { url: string }) => {
       return await executeWebRead(
         this.configService.get('SURF_API_URL') || 'http://localhost:8000',
@@ -229,7 +229,7 @@ export class AIService {
     historyMessages.push({ role: 'user', content: prompt });
 
     return new Observable((observer) => {
-      this.processConversation(historyMessages, observer, chat.id, 0).catch(
+      this.processConversationB(historyMessages, observer, chat.id, 0).catch(
         (err) => observer.error(err),
       );
     });
@@ -254,9 +254,14 @@ export class AIService {
         { role: 'user', content: prompt },
       ],
     });
-    const title = JSON.parse(
-      titleResponse.choices[0]?.message.content || '{}',
-    ).title;
+    let title: string | undefined;
+    try {
+      title = JSON.parse(
+        titleResponse.choices[0]?.message.content || '{}',
+      ).title;
+    } catch (e) {
+      title = 'New Chat'; // Default title in case of parsing error
+    }
 
     const newChat = await this.db.chat.create({
       data: {
@@ -274,19 +279,21 @@ export class AIService {
         return {
           role: history.role as 'tool',
           content: history.content,
+          name: history.name,
           tool_call_id: history.toolCallId || '',
-        };
+        } as ChatMessage;
+      } else {
+        return {
+          role: history.role as 'user' | 'assistant',
+          content: history.content,
+        } as ChatMessage;
       }
-      return {
-        role: history.role as 'user' | 'assistant',
-        content: history.content,
-      };
     });
 
     return new Observable((observer) => {
       observer.next(JSON.stringify({ id: newChat.id }));
 
-      this.processConversation(historyMessages, observer, newChat.id, 0).catch(
+      this.processConversationB(historyMessages, observer, newChat.id, 0).catch(
         (err) => observer.error(err),
       );
     });
@@ -332,6 +339,27 @@ export class AIService {
       observer.complete();
       return;
     }
+    // 메시지 형식을 OpenAI 형식으로 변환
+    const openaiMessages = messages.map((msg) => {
+      const baseMsg: any = {
+        role: msg.role,
+        content: msg.content,
+      };
+
+      if (msg.tool_calls) {
+        baseMsg.tool_calls = msg.tool_calls;
+      }
+
+      if (msg.tool_call_id) {
+        baseMsg.tool_call_id = msg.tool_call_id;
+      }
+
+      if (msg.name) {
+        baseMsg.name = msg.name;
+      }
+
+      return baseMsg;
+    });
 
     const completion = await this.openai.chat.completions.create({
       model: 'solar-pro2',
@@ -340,7 +368,7 @@ export class AIService {
           role: 'system',
           content: defaultPrompt,
         },
-        ...messages,
+        ...openaiMessages,
       ],
       tools: availableTools,
       tool_choice: 'auto',
@@ -365,7 +393,26 @@ export class AIService {
       for (const toolCall of toolCalls) {
         const functionName = toolCall.function?.name;
         if (functionName) {
+          console.log(functionName);
           const functionToCall = this.availableFunctions[functionName];
+          switch (functionName) {
+            case 'create_sub_agent':
+              if (toolCall.function) {
+                toolCall.function.arguments = JSON.stringify({
+                  ...JSON.parse(toolCall.function?.arguments ?? '{}'),
+                  chatId,
+                });
+              }
+              break;
+            case 'find_sub_agent':
+              if (toolCall.function) {
+                toolCall.function.arguments = JSON.stringify({
+                  ...JSON.parse(toolCall.function.arguments ?? '{}'),
+                  chatId,
+                });
+              }
+              break;
+          }
           const functionArgs = JSON.parse(toolCall.function?.arguments || '{}');
           const functionResponse = await functionToCall(functionArgs);
           messages.push({
@@ -396,7 +443,7 @@ export class AIService {
     if (response.includes('[REPEAT]')) {
       await this.processConversation(
         [
-          ...messages,
+          ...openaiMessages,
           {
             role: 'assistant',
             content: response.replace('[REPEAT]', ''),
@@ -421,138 +468,138 @@ export class AIService {
     }
   }
 
-  // private async processConversation(
-  //   messages: ChatMessage[],
-  //   observer: Observer<string>,
-  //   chatId: string,
-  //   totalTokens: number,
-  //   maxIterations: number = 10,
-  //   currentIteration: number = 0,
-  // ) {
-  //   this.logger.log('current iter', currentIteration);
-  //   this.logger.log('total tokens', totalTokens);
-  //   // 최대 반복 또는 토큰 제한 체크
-  //   if (currentIteration >= maxIterations || totalTokens > 50000) {
-  //     observer.next('\n\n[대화가 제한에 도달하여 종료됩니다.]');
-  //     observer.complete();
-  //     return;
-  //   }
+  private async processConversationB(
+    messages: ChatMessage[],
+    observer: Observer<string>,
+    chatId: string,
+    totalTokens: number,
+    maxIterations: number = 10,
+    currentIteration: number = 0,
+  ) {
+    this.logger.log('current iter', currentIteration);
+    this.logger.log('total tokens', totalTokens);
+    // 최대 반복 또는 토큰 제한 체크
+    if (currentIteration >= maxIterations || totalTokens > 50000) {
+      observer.next('\n\n[대화가 제한에 도달하여 종료됩니다.]');
+      observer.complete();
+      return;
+    }
 
-  //   // 메시지 형식을 OpenAI 형식으로 변환
-  //   const openaiMessages = messages.map((msg) => {
-  //     const baseMsg: any = {
-  //       role: msg.role,
-  //       content: msg.content,
-  //     };
+    // 메시지 형식을 OpenAI 형식으로 변환
+    const openaiMessages = messages.map((msg) => {
+      const baseMsg: any = {
+        role: msg.role,
+        content: msg.content,
+      };
 
-  //     if (msg.tool_calls) {
-  //       baseMsg.tool_calls = msg.tool_calls;
-  //     }
+      if (msg.tool_calls) {
+        baseMsg.tool_calls = msg.tool_calls;
+      }
 
-  //     if (msg.tool_call_id) {
-  //       baseMsg.tool_call_id = msg.tool_call_id;
-  //     }
+      if (msg.tool_call_id) {
+        baseMsg.tool_call_id = msg.tool_call_id;
+      }
 
-  //     if (msg.name) {
-  //       baseMsg.name = msg.name;
-  //     }
+      if (msg.name) {
+        baseMsg.name = msg.name;
+      }
 
-  //     return baseMsg;
-  //   });
+      return baseMsg;
+    });
 
-  //   const response = await this.openai.chat.completions.create({
-  //     model: 'solar-pro2',
-  //     messages: openaiMessages,
-  //     tools: availableTools,
-  //     tool_choice: 'auto',
-  //   } as OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming);
+    const response = await this.openai.chat.completions.create({
+      model: 'solar-pro2',
+      messages: openaiMessages,
+      tools: availableTools,
+      tool_choice: 'auto',
+    } as OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming);
 
-  //   const message = response.choices[0]?.message;
-  //   const usage = response.usage;
-  //   totalTokens += usage?.total_tokens || 0;
-  //   this.logger.log('tool_calls:', message?.tool_calls);
+    const message = response.choices[0]?.message;
+    const usage = response.usage;
+    totalTokens += usage?.total_tokens || 0;
+    this.logger.log('tool_calls:', message?.tool_calls);
 
-  //   if (message?.tool_calls && message.tool_calls.length > 0) {
-  //     // 도구 호출이 있는 경우
-  //     const toolResults: ChatMessage[] = [];
+    if (message?.tool_calls && message.tool_calls.length > 0) {
+      // 도구 호출이 있는 경우
+      const toolResults: ChatMessage[] = [];
 
-  //     for (const toolCall of message.tool_calls) {
-  //       try {
-  //         if (toolCall.type === 'function' && toolCall.function) {
-  //           const functionName = toolCall.function.name;
-  //           const functionToCall = this.availableFunctions[functionName];
+      for (const toolCall of message.tool_calls) {
+        try {
+          if (toolCall.type === 'function' && toolCall.function) {
+            const functionName = toolCall.function.name;
+            const functionToCall = this.availableFunctions[functionName];
 
-  //           if (functionToCall) {
-  //             const functionArgs = JSON.parse(toolCall.function.arguments);
-  //             const functionResponse = await functionToCall(functionArgs);
+            if (functionToCall) {
+              const functionArgs = JSON.parse(toolCall.function.arguments);
+              const functionResponse = await functionToCall(functionArgs);
 
-  //             toolResults.push({
-  //               role: 'tool' as const,
-  //               tool_call_id: toolCall.id,
-  //               name: functionName,
-  //               content: JSON.stringify(functionResponse),
-  //             });
-  //           }
-  //         }
-  //       } catch (error) {
-  //         console.error('도구 호출 처리 오류:', error);
-  //         if (toolCall.type === 'function' && toolCall.function) {
-  //           toolResults.push({
-  //             role: 'tool' as const,
-  //             tool_call_id: toolCall.id,
-  //             name: toolCall.function?.name || 'unknown',
-  //             content: JSON.stringify({ error: '도구 호출 실패' }),
-  //           });
-  //         } else {
-  //           toolResults.push({
-  //             role: 'tool' as const,
-  //             tool_call_id: toolCall.id,
-  //             name: 'unknown',
-  //             content: JSON.stringify({ error: '알 수 없는 도구 호출' }),
-  //           });
-  //         }
-  //       }
-  //     }
+              toolResults.push({
+                role: 'tool' as const,
+                tool_call_id: toolCall.id,
+                name: functionName,
+                content: JSON.stringify(functionResponse),
+              });
+            }
+          }
+        } catch (error) {
+          console.error('도구 호출 처리 오류:', error);
+          if (toolCall.type === 'function' && toolCall.function) {
+            toolResults.push({
+              role: 'tool' as const,
+              tool_call_id: toolCall.id,
+              name: toolCall.function?.name || 'unknown',
+              content: JSON.stringify({ error: '도구 호출 실패' }),
+            });
+          } else {
+            toolResults.push({
+              role: 'tool' as const,
+              tool_call_id: toolCall.id,
+              name: 'unknown',
+              content: JSON.stringify({ error: '알 수 없는 도구 호출' }),
+            });
+          }
+        }
+      }
 
-  //     // assistant 메시지와 tool 결과를 히스토리에 추가
-  //     messages.push({
-  //       role: 'assistant' as const,
-  //       content: message.content || '',
-  //       tool_calls: message.tool_calls,
-  //     });
-  //     messages.push(...toolResults);
+      // assistant 메시지와 tool 결과를 히스토리에 추가
+      messages.push({
+        role: 'assistant' as const,
+        content: message.content || '',
+        tool_calls: message.tool_calls,
+      });
+      messages.push(...toolResults);
 
-  //     // 재귀적으로 다음 응답 처리
-  //     await this.processConversation(
-  //       messages,
-  //       observer,
-  //       chatId,
-  //       totalTokens,
-  //       maxIterations,
-  //       currentIteration + 1,
-  //     );
-  //   } else {
-  //     // 일반 텍스트 응답
-  //     const content = message?.content || '';
-  //     observer.next(content);
-  //     observer.complete();
+      // 재귀적으로 다음 응답 처리
+      await this.processConversationB(
+        messages,
+        observer,
+        chatId,
+        totalTokens,
+        maxIterations,
+        currentIteration + 1,
+      );
+    } else {
+      // 일반 텍스트 응답
+      const content = message?.content || '';
+      observer.next(content);
+      observer.complete();
 
-  //     // DB에 최종 응답 저장
-  //     await this.db.chat.update({
-  //       where: { id: chatId },
-  //       data: {
-  //         histories: {
-  //           create: [
-  //             {
-  //               role: 'assistant',
-  //               content,
-  //             },
-  //           ],
-  //         },
-  //       },
-  //     });
-  //   }
-  // }
+      // DB에 최종 응답 저장
+      await this.db.chat.update({
+        where: { id: chatId },
+        data: {
+          histories: {
+            create: [
+              {
+                role: 'assistant',
+                content,
+              },
+            ],
+          },
+        },
+      });
+    }
+  }
 
   // async startNewChat(userName: string, prompt: string) {
   //   if (!userName) {

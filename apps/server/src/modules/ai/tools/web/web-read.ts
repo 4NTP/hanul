@@ -21,7 +21,7 @@ export const webReadTool = {
 export const executeWebRead = async (
   surfApiUrl: string,
   { url }: { url: string },
-): Promise<string> => {
+): Promise<string | null> => {
   try {
     const response = await fetch(`${surfApiUrl}/read/${encodeURI(url)}`, {
       method: 'GET',
@@ -38,6 +38,7 @@ export const executeWebRead = async (
     return await response.json();
   } catch (error) {
     console.log('Error fetching URL:', url);
-    throw new Error(`Error fetching URL`);
+    return null;
+    // throw new Error(`Error fetching URL`);
   }
 };

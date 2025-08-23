@@ -34,18 +34,18 @@ export class AIController {
     @CurrentUser() user,
     @Body() { prompt }: CreateTextRequestDto,
   ) {
-    return await this.aiService.startNewChat(user.id, prompt);
+    return await this.aiService.startNewChat(user.sub, prompt);
   }
 
   @Get('chat')
   @UseGuards(TokensGuard)
   async getChats(@CurrentUser() user) {
-    return await this.aiService.getChats(user?.id);
+    return await this.aiService.getChats(user?.sub);
   }
 
   @Get('chat/:id')
   @UseGuards(TokensGuard)
   async getChatHistories(@CurrentUser() user, @Param('id') chatId: string) {
-    return await this.aiService.getChatHistories(user.id, chatId);
+    return await this.aiService.getChatHistories(user.sub, chatId);
   }
 }

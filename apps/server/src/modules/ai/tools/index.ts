@@ -10,7 +10,7 @@ export const availableTools = [
   fetchTool,
 
   // Think
-  sequentialThinkingTool,
+  // sequentialThinkingTool,
 
   // Web
   webReadTool,
