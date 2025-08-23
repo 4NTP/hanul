@@ -1,3 +1,5 @@
+import { DbService } from '@/modules/db/db.service';
+
 export const subAgentRunTool = {
   type: 'function' as const,
   function: {
@@ -11,12 +13,23 @@ export const subAgentRunTool = {
           type: 'string',
           description: 'The SubAgent id to run',
         },
-        input: {
-          type: 'string',
-          description: 'The input/instruction for the Sub Agent',
-        },
+        // prompt: {
+        //   type: 'string',
+        //   description: 'The prompt/instruction for the Sub Agent',
+        // },
       },
-      required: ['id', 'input'],
+      required: ['id'],
     },
   },
 };
+
+export async function RunSubAgent(Db: DbService, subAgentId: string) {
+  const agent = await Db.subAgent.findUnique({
+    where: { id: subAgentId },
+  });
+  if (!agent) {
+    throw new Error(`SubAgent with id ${subAgentId} not found`);
+  }
+
+  return agent;
+}
