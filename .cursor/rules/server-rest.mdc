@@ -1,0 +1,48 @@
+---
+globs: apps/server/**/*
+description: NestJS server uses RESTful controllers with modular architecture and DTO validation
+---
+
+NestJS + REST Principles
+
+- Architecture
+  - Expose API via REST controllers using `@Controller`, `@Get`, `@Post`, etc.
+  - Organize by feature modules to maximize reuse and isolation.
+  - Keep providers stateless where feasible; inject dependencies via `@Module`.
+
+- Modules
+  - One feature = one module: `UserModule`, `AuthModule`, etc.
+  - Export shared providers/services for reuse.
+  - Avoid circular deps; extract shared logic to dedicated modules.
+
+- Controllers & Services
+  - Thin controllers: delegate business logic to services.
+  - Use `@Param`, `@Query`, `@Body` with Zod schemas for input typing and validation.
+  - Consistent response envelope (success/data/error) across endpoints.
+
+- Validation & DTO
+  - Prefer `zod` schemas co-located with each feature (params/query/body).
+  - Apply validation via a global or per-route Zod pipe (e.g., custom pipe or `nestjs-zod`).
+  - Transform and normalize inputs explicitly in services; avoid hidden transforms.
+  - Narrow types at boundaries with `z.infer<typeof Schema>`; keep domain types inside services.
+
+- Error Handling
+  - Map domain errors to HTTP codes via exception filters.
+  - Convert Zod issues into 400 responses with a stable error payload.
+  - No raw errors across boundary; use typed error structures.
+
+- Testing
+  - Unit-test services; e2e-test controllers.
+  - Mock Prisma layer in unit tests; use test db/schema for e2e.
+
+Performance & Reliability
+
+- Avoid N+1 with batched service methods; paginate read endpoints by default.
+- Structured logs with correlation IDs; include method, path, status, duration.
+- Version routes (e.g., `/api/v1`) and document with OpenAPI (Swagger).
+  - For OpenAPI from Zod, use `zod-to-openapi` or compatible tooling.
+
+References
+
+- Server package: [apps/server/package.json](mdc:apps/server/package.json)
+

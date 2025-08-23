@@ -1,0 +1,39 @@
+---
+alwaysApply: true
+description: Cross-cutting rules for code quality, performance, testing, and DX
+---
+
+General Quality
+
+- Type Safety: No `any` in public APIs. Prefer explicit types and inference at call sites.
+- Modularity: Small, focused modules; feature-first folder structure.
+- Error Handling: Use typed error envelopes; no raw throws across boundaries.
+- Logging: Structured logs; include correlation IDs in server.
+
+Performance
+
+- Avoid unnecessary allocations and object churn in hot paths.
+- Batch I/O where possible; debounce/throttle user-initiated actions.
+- Apply memoization judiciously; measure before/after.
+
+Testing
+
+- Unit tests for pure logic; integration for module boundaries; e2e for flows.
+- Snapshot tests only for stable, low-noise UI.
+- Keep tests fast and isolated; avoid cross-test state.
+
+Linting & Formatting
+
+- ESLint configs are centralized in `packages/eslint-config`; extend them in apps/packages.
+- Prettier for formatting via pre-commit hook; zero warnings allowed in CI.
+- Ignore lists are curated in root [eslint.config.js](mdc:eslint.config.js).
+
+Documentation
+
+- Keep README per app/package with quickstart and decisions.
+- Document non-obvious trade-offs and performance-sensitive code.
+
+Consistency & Cross-Referencing
+
+- Always maintain consistency by referencing existing code patterns and applying diverse, well-reasoned ideas where appropriate. Before introducing a new approach, review similar features/modules and align naming, structure, and conventions. If diverging for a valid reason, document the rationale briefly in the PR description.
+

@@ -1,0 +1,43 @@
+---
+alwaysApply: true
+description: Conventional Commits enforced via commitlint and Husky
+---
+
+Conventional Commits
+
+- Purpose: Enforce consistent, machine-readable commit messages for changelogs, semantic versioning, and clarity.
+- Tooling: commitlint + Husky hooks.
+  - Config: [commitlint.config.cjs](mdc:commitlint.config.cjs)
+  - Hook: [.husky/commit-msg](mdc:.husky/commit-msg)
+
+Format
+
+- Required: `type(scope)!: subject`
+- Allowed types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
+- Subject: imperative, lower-case, no trailing period.
+- Body (optional): explain what and why, not how.
+- Footer (when needed): `BREAKING CHANGE: ...`, `Refs: #123`.
+
+Examples
+
+```
+feat(auth): add tRPC procedure for email login
+
+fix(ui): correct Button ghost variant contrast on dark theme
+
+refactor(server): modularize user router into feature module
+
+perf(web): enable React 19 cache for list page data
+
+feat(db)!: rename userId to accountId in prisma schema
+
+BREAKING CHANGE: userId field has been replaced with accountId across the API
+```
+
+Guardrails
+
+- One change per commit whenever practical.
+- Use `revert:` type only via `git revert` output.
+- Use `scope` to reflect package/app (e.g., `web`, `server`, `ui`, `db`, `infra`).
+- Pre-commit format/lint runs via [.husky/pre-commit](mdc:.husky/pre-commit).
+

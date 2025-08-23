@@ -1,0 +1,27 @@
+---
+globs: prisma/**/*
+description: Prisma with PostgreSQL — schema, migrations, and usage conventions
+---
+
+Database Rules
+
+- Technology
+  - ORM: Prisma
+  - DB: PostgreSQL
+  - Schema: [prisma/schema.prisma](mdc:prisma/schema.prisma)
+
+- Schema & Migrations
+  - Model naming is singular; tables pluralized by Prisma by default.
+  - Use `@id`, `@unique`, `@index` appropriately; always index FK.
+  - Migration per logical change; keep migration messages descriptive.
+
+- Usage
+  - Generate client in CI and at build where needed.
+  - Transactions for multi-step writes; prefer `prisma.$transaction`.
+  - Avoid N+1 by batched queries; use `include/select` narrowly.
+
+- Performance & Reliability
+  - Use connection pooling; configure via `DATABASE_URL` params.
+  - Set timeouts and retries conservatively for critical paths.
+  - Avoid full-table scans; paginate reads.
+

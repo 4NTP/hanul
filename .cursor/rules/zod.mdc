@@ -1,0 +1,24 @@
+---
+alwaysApply: true
+description: Zod-first validation strategy across server and web boundaries
+---
+
+Zod-First Validation
+
+- Boundaries
+  - Define Zod schemas for all external inputs/outputs: HTTP params, query, body, and responses.
+  - Infer TypeScript types via `z.infer<typeof Schema>`; avoid hand-written duplicates.
+
+- Server
+  - Validate request shapes with Zod (custom pipes or `nestjs-zod`).
+  - Convert Zod errors into consistent 400 payloads.
+  - Use response schemas to serialize success envelopes.
+
+- Web
+  - Parse REST responses with Zod before using data.
+  - Centralize fetcher that applies schema parsing and error mapping.
+
+- Tooling
+  - Consider `zod-to-openapi` to generate OpenAPI from Zod.
+  - Prefer co-location: `feature.schema.ts` near controller/service/hooks.
+

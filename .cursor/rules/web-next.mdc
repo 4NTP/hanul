@@ -1,0 +1,38 @@
+---
+globs: apps/web/**/*
+description: Next.js app standards for hooks-first usage, SSR/CSR balance, and REST API consumption
+---
+
+Next.js Design Rules
+
+- Data Layer
+  - Consume server via typed REST clients/fetchers; centralize base URL and headers.
+  - Co-locate query/mutation hooks (e.g., `useUserQuery`) in `app/hooks`.
+  - Validate responses with `zod` and infer client-side types from schemas.
+  - Apply sensible cache keys and invalidation rules per resource.
+
+- Rendering Strategy
+  - Balance SSR/CSR per page to avoid content flash/text reflow.
+  - Hydration-safe UI: avoid relying on client-only values for initial paint.
+  - Use streaming/partial rendering only when stable.
+
+- UI Consistency
+  - Use `@jx/ui` primitives and shadcn patterns exclusively.
+  - Font sizes and colors follow the design scale; avoid ad-hoc values.
+  - Theme support via `next-themes`; avoid layout shift on theme toggle.
+
+- Hooks-First
+  - Encapsulate loading/error/suspense in reusable hooks.
+  - Keep components presentational where possible.
+  - No business logic in server components unless required by SSR data.
+
+- Performance
+  - Prefer server data fetching for SEO-critical pages.
+  - Memoize heavy subtrees; use `useMemo`/`useCallback` prudently.
+  - Use `next/image` for images; prefetch critical routes.
+
+References
+
+- Web package: [apps/web/package.json](mdc:apps/web/package.json)
+- Next config: [apps/web/next.config.js](mdc:apps/web/next.config.js)
+

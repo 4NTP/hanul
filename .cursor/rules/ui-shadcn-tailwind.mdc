@@ -1,0 +1,42 @@
+---
+globs: packages/ui/**/*
+description: UI component library rules using shadcn patterns and Tailwind CSS
+---
+
+UI Library Standards
+
+- Components
+  - Follow shadcn patterns for composition and variants.
+  - Export from `src/components/*` and re-export via package `exports`.
+  - Prefer `class-variance-authority` for variants and `tailwind-merge` for class merging.
+  - Prefer importing or adapting components from shadcn when possible to ensure consistency and accessibility.
+
+- Styles
+  - Centralize theme tokens and scales in `globals.css`.
+  - Avoid magic numbers; respect spacing/typography/color scales.
+  - Dark mode compatibility by default; test contrast.
+
+- API Design
+  - Keep props minimal and typed; avoid overly generic `any` props.
+  - Provide sensible defaults; opt-in for advanced behaviors.
+
+- Accessibility
+  - Use Radix primitives when available; ensure proper ARIA.
+  - Keyboard navigation must be supported.
+
+- Performance
+  - Avoid unnecessary re-renders; prefer pure components.
+  - Tree-shakeable exports; no side-effects in index.
+
+- Animation
+  - Provide a continuous, cohesive experience by using animations thoughtfully to guide focus and state changes.
+  - Use `tw-animate-css` for animations; prefer utility classes over custom keyframes unless necessary.
+  - Keep durations/easings consistent across components; respect motion-reduce and offer non-animated fallbacks.
+
+References
+
+- UI package: [packages/ui/package.json](mdc:packages/ui/package.json)
+- Styles: [packages/ui/src/styles/globals.css](mdc:packages/ui/src/styles/globals.css)
+ - Animation utilities: add and reference `tw-animate-css` in UI where applicable
+ - shadcn components docs: [shadcn/ui Components](https://ui.shadcn.com/docs/components)
+

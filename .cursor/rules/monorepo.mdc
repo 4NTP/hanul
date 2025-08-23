@@ -1,0 +1,37 @@
+---
+alwaysApply: true
+description: Turborepo monorepo structure, scripts, and task orchestration
+---
+
+Monorepo Overview
+
+- Tooling: Turborepo + pnpm workspaces.
+- Root scripts: [package.json](mdc:package.json)
+- Turborepo config: [turbo.json](mdc:turbo.json)
+
+Project Layout
+
+- Apps
+  - `apps/web`: Next.js app consuming REST API and `@jx/ui`.
+  - `apps/server`: NestJS app exposing RESTful controllers.
+- Packages
+  - `packages/ui`: Shadcn/Tailwind-based UI library exported to apps.
+  - `packages/*`: shared configs (ESLint, Jest, TSConfig).
+- Database
+  - `prisma/schema.prisma`: Prisma schema using PostgreSQL.
+
+Task Conventions
+
+- Use `pnpm` at root to run pipelines:
+  - `pnpm dev`: run all `dev` in parallel.
+  - `pnpm build`: topological build with caching.
+  - `pnpm lint`, `pnpm test`, `pnpm format`.
+- Add app/package-level scripts with consistent names: `dev`, `build`, `start`, `lint`, `test`.
+- Prefer incremental tasks and deterministic outputs for caching.
+
+Dependencies
+
+- Prefer `workspace:*` for internal packages.
+- Keep runtime deps vs devDeps strict; do not leak build-only deps into runtime.
+- Co-locate type configs in `packages/typescript-config` and reuse via `extends`.
+

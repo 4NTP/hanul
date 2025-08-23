@@ -1,0 +1,55 @@
+---
+globs: apps/web/**/*
+description: Internationalization (i18n) rules for the Next.js app using next-intl
+---
+
+## i18n Rules (next-intl)
+
+- Baseline
+  - Use `next-intl` across the app. Source of truth files:
+    - Routing: [apps/web/i18n/routing.ts](mdc:apps/web/i18n/routing.ts)
+    - Server request config (message loading): [apps/web/i18n/request.ts](mdc:apps/web/i18n/request.ts)
+    - Middleware (locale negotiation): [apps/web/middleware.ts](mdc:apps/web/middleware.ts)
+    - Next config plugin: [apps/web/next.config.js](mdc:apps/web/next.config.js)
+  - Do not import translations on the client. Load messages on the server and pass via `NextIntlClientProvider`.
+
+- Messages
+  - Location: `apps/web/messages/{locale}.json` (e.g., `en.json`, `ko.json`).
+  - Use stable, dot-delimited keys: `namespace.section.key`.
+  - Avoid string concatenation in translations. Use interpolation: `t('key', {name})`.
+  - Keep units small and reusable; avoid full paragraphs unless necessary.
+  - Keep placeholders, ARIA labels, and titles in messages (no hard-coded UI strings).
+
+- Routing & Links
+  - Localized routes are under `app/[locale]/...`.
+  - Use `next-intl` navigation helpers/components (e.g., `Link` from `next-intl/navigation`) to preserve the active locale.
+  - When adding a new locale, update both `routing.locales` and provide the corresponding message file.
+
+- Providers
+  - Wrap layouts with `NextIntlClientProvider` using the resolved `locale`.
+  - Reference: [apps/web/components/server-providers.tsx](mdc:apps/web/components/server-providers.tsx) and `app/[locale]/layout.tsx`.
+
+- Usage Patterns
+  - Server/Client components: use `useTranslations('namespace')` for text and `useFormatter()` for dates/numbers.
+  - Pass variables via params, not manual string formatting.
+  - Localize all non-visible text too (alt, title, aria-*, placeholders).
+
+- Adding a Locale (checklist)
+  - Update locales in [apps/web/i18n/routing.ts](mdc:apps/web/i18n/routing.ts).
+  - Add `apps/web/messages/{new-locale}.json`.
+  - Verify middleware negotiation via [apps/web/middleware.ts](mdc:apps/web/middleware.ts).
+  - Ensure fonts/typography support the new script if needed.
+
+- Performance & SEO
+  - Only load the active locale’s messages via dynamic import in [apps/web/i18n/request.ts](mdc:apps/web/i18n/request.ts); do not bundle all locales.
+  - Avoid client-side fetch for translations; keep them server-provided to reduce hydration mismatches.
+  - Provide `alternates`/`hreflang` in page metadata where applicable.
+
+- Testing
+  - For unit tests, wrap components with a `NextIntlClientProvider` test helper and stub messages for the target namespace.
+
+- Pitfalls
+  - No hard-coded strings in UI components; use `t()`.
+  - Do not rely on English fallbacks in code; add missing keys to message files.
+  - Keep translation keys stable; renames should be done explicitly across all locales.
+
