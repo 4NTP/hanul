@@ -66,6 +66,7 @@ const defaultPrompt = `
 - \`<update_sub_agent>\`: 에이전트 개선 시
 - \`<delete_sub_agent>\`: 에이전트 제거 시
 - \`<find_sub_agent>\`: 에이전트 검색 시
+- \`<run_sub_agent>\`: 에이전트 실행 시
 
 ## 5. 서브 에이전트 프롬프트 작성 가이드
 
@@ -168,8 +169,12 @@ export class AIService {
         args,
       );
     },
-    create_sub_agent: async (args: { prompt: string; chatId: string }) => {
-      return await CreateSubAgent(this.db, args.chatId, {
+    create_sub_agent: async (args: {
+      prompt: string;
+      chatId: string;
+      name: string;
+    }) => {
+      return await CreateSubAgent(this.db, args.chatId, args.name, {
         prompt: args.prompt,
       });
     },
