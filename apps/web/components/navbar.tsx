@@ -30,9 +30,9 @@ export default function Navbar() {
 
           {isAuthenticated && user ? (
             <>
-              <span className="text-sm text-foreground/70">{user.name}님</span>
+              <span className="text-sm text-foreground/70">{user.name}</span>
               <Button size="sm" variant="ghost" onClick={signOut}>
-                로그아웃
+                {t('signOut')}
               </Button>
             </>
           ) : (

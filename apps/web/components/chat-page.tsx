@@ -23,7 +23,8 @@ export function ChatPage() {
   const locale = useLocale();
   const router = useRouter();
   const params = useParams();
-  const chatId = params?.id as string | undefined;
+  const chatId =
+    typeof params?.id === 'string' ? (params.id as string) : undefined;
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
@@ -81,11 +82,10 @@ export function ChatPage() {
 
   const sendMessageMutation = useMutation({
     mutationFn: async (prompt: string) => {
-      if (chatId) {
+      if (typeof chatId === 'string' && chatId.length > 0) {
         return chatAPI.continueChat(chatId, { prompt });
-      } else {
-        return chatAPI.createChat({ prompt });
       }
+      return chatAPI.createChat({ prompt });
     },
     onSuccess: async (stream) => {
       setIsStreaming(true);
@@ -95,42 +95,52 @@ export function ChatPage() {
       const decoder = new TextDecoder();
       let fullResponse = '';
       let chatIdFromResponse = '';
+      let buffer = '';
 
       try {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
-          const chunk = decoder.decode(value, { stream: true });
+          buffer += decoder.decode(value, { stream: true });
 
-          // Split by lines to handle SSE format
-          const lines = chunk.split('\n');
+          // Process complete SSE events separated by blank lines (\n\n or \r\n\r\n)
+          const events = buffer.split(/\r?\n\r?\n/);
+          // Keep the last partial event (if any) in the buffer
+          buffer = events.pop() || '';
 
-          for (const line of lines) {
-            if (line.trim() === '') continue;
+          for (const event of events) {
+            if (!event) continue;
 
-            // Handle SSE data format
-            if (line.startsWith('data: ')) {
-              const data = line.substring(6); // Remove 'data: ' prefix but keep spaces
+            const lines = event.split(/\r?\n/);
+            const dataLines: string[] = [];
 
-              // Check for chat ID in JSON format (for new chats)
-              if (!chatId && data.includes('"id"')) {
-                try {
-                  const jsonData = JSON.parse(data.trim());
-                  if (jsonData.id) {
-                    chatIdFromResponse = jsonData.id;
-                    continue; // Skip adding this to response
-                  }
-                } catch (e) {
-                  // Not JSON, continue with text processing
+            for (const line of lines) {
+              const match = line.match(/^data:\s?(.*)$/);
+              if (match) {
+                dataLines.push(match[1] ?? '');
+              }
+            }
+
+            const data = dataLines.join('\n');
+            if (!data) continue;
+
+            // Handle chat ID (first event for new chats)
+            if (!chatId && data.includes('"id"')) {
+              try {
+                const jsonData = JSON.parse(data.trim());
+                if (jsonData.id) {
+                  chatIdFromResponse = jsonData.id;
+                  continue;
                 }
+              } catch (_) {
+                // Not JSON; fall through to treat as content
               }
+            }
 
-              // Add actual content to response (including spaces)
-              if (data && data.trim() !== '[DONE]' && !data.includes('"id"')) {
-                fullResponse += data;
-                setCurrentResponse(fullResponse);
-              }
+            if (data.trim() !== '[DONE]' && !data.includes('"id"')) {
+              fullResponse += data;
+              setCurrentResponse(fullResponse);
             }
           }
 
@@ -313,78 +323,74 @@ export function ChatPage() {
               </div>
               <div className="max-w-[85%] sm:max-w-lg md:max-w-xl lg:max-w-2xl rounded-lg px-4 py-2 bg-muted">
                 <div className="text-sm">
-                  <div className="inline">
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      rehypePlugins={[rehypeHighlight]}
-                      components={{
-                        p: ({ children }) => (
-                          <p className="mb-2 last:mb-0 inline">{children}</p>
-                        ),
-                        h1: ({ children }) => (
-                          <h1 className="text-lg font-bold mb-2">{children}</h1>
-                        ),
-                        h2: ({ children }) => (
-                          <h2 className="text-base font-bold mb-2">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    rehypePlugins={[rehypeHighlight]}
+                    components={{
+                      p: ({ children }) => (
+                        <p className="mb-2 last:mb-0">{children}</p>
+                      ),
+                      h1: ({ children }) => (
+                        <h1 className="text-lg font-bold mb-2">{children}</h1>
+                      ),
+                      h2: ({ children }) => (
+                        <h2 className="text-base font-bold mb-2">{children}</h2>
+                      ),
+                      h3: ({ children }) => (
+                        <h3 className="text-sm font-bold mb-1">{children}</h3>
+                      ),
+                      ul: ({ children }) => (
+                        <ul className="list-disc pl-4 mb-2">{children}</ul>
+                      ),
+                      ol: ({ children }) => (
+                        <ol className="list-decimal pl-4 mb-2">{children}</ol>
+                      ),
+                      li: ({ children }) => (
+                        <li className="mb-1">{children}</li>
+                      ),
+                      blockquote: ({ children }) => (
+                        <blockquote className="border-l-4 border-muted-foreground pl-4 italic mb-2">
+                          {children}
+                        </blockquote>
+                      ),
+                      code: ({ children, className }) => {
+                        const isInline = !className;
+                        return isInline ? (
+                          <code className="bg-muted/60 border border-border px-2 py-1 rounded text-xs font-mono">
                             {children}
-                          </h2>
-                        ),
-                        h3: ({ children }) => (
-                          <h3 className="text-sm font-bold mb-1">{children}</h3>
-                        ),
-                        ul: ({ children }) => (
-                          <ul className="list-disc pl-4 mb-2">{children}</ul>
-                        ),
-                        ol: ({ children }) => (
-                          <ol className="list-decimal pl-4 mb-2">{children}</ol>
-                        ),
-                        li: ({ children }) => (
-                          <li className="mb-1">{children}</li>
-                        ),
-                        blockquote: ({ children }) => (
-                          <blockquote className="border-l-4 border-muted-foreground pl-4 italic mb-2">
+                          </code>
+                        ) : (
+                          <code className={`${className} text-xs font-mono`}>
                             {children}
-                          </blockquote>
-                        ),
-                        code: ({ children, className }) => {
-                          const isInline = !className;
-                          return isInline ? (
-                            <code className="bg-muted/60 border border-border px-2 py-1 rounded text-xs font-mono">
-                              {children}
-                            </code>
-                          ) : (
-                            <code className={`${className} text-xs font-mono`}>
-                              {children}
-                            </code>
-                          );
-                        },
-                        pre: ({ children }) => (
-                          <pre className="bg-muted/80 border border-border p-4 rounded-lg overflow-x-auto text-xs font-mono mb-3 shadow-sm">
-                            {children}
-                          </pre>
-                        ),
-                        strong: ({ children }) => (
-                          <strong className="font-bold">{children}</strong>
-                        ),
-                        em: ({ children }) => (
-                          <em className="italic">{children}</em>
-                        ),
-                        a: ({ children, href }) => (
-                          <a
-                            href={href}
-                            className="text-blue-500 hover:text-blue-700 underline"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            {children}
-                          </a>
-                        ),
-                      }}
-                    >
-                      {currentResponse}
-                    </ReactMarkdown>
-                    <span className="animate-pulse">▋</span>
-                  </div>
+                          </code>
+                        );
+                      },
+                      pre: ({ children }) => (
+                        <pre className="bg-muted/80 border border-border p-4 rounded-lg overflow-x-auto text-xs font-mono mb-3 shadow-sm">
+                          {children}
+                        </pre>
+                      ),
+                      strong: ({ children }) => (
+                        <strong className="font-bold">{children}</strong>
+                      ),
+                      em: ({ children }) => (
+                        <em className="italic">{children}</em>
+                      ),
+                      a: ({ children, href }) => (
+                        <a
+                          href={href}
+                          className="text-blue-500 hover:text-blue-700 underline"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {children}
+                        </a>
+                      ),
+                    }}
+                  >
+                    {currentResponse}
+                  </ReactMarkdown>
+                  <span className="animate-pulse">▋</span>
                 </div>
               </div>
             </div>

@@ -16,7 +16,8 @@
     "locale": {
       "en": "English",
       "ko": "한국어"
-    }
+    },
+    "signOut": "로그아웃"
   },
   "Landing": {
     "badge": "AI 기반 지능형 서비스",
