@@ -59,6 +59,7 @@
       "placeholder": "Type a message..."
     },
     "send": "Send",
-    "sending": "Sending..."
+    "sending": "Sending...",
+    "think": "Thinking..."
   }
 }

@@ -12,8 +12,9 @@ export interface CreateChatResponse {
 
 export interface ChatHistory {
   id: string;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'tool';
   content: string;
+  name?: string;
 }
 
 export interface Chat {
