@@ -273,7 +273,7 @@ export class AIService {
         {
           role: 'system',
           content:
-            '다음 유저가 채팅한 내역을 토대로 적절한 제목을 생성하세요. 제목은 유저가 사용한 언어로 생성하세요.',
+            "Generate a title for the chat based on the user's prompt. The title should be in the language of the user.",
         },
         { role: 'user', content: prompt },
       ],
@@ -287,7 +287,7 @@ export class AIService {
             properties: {
               title: {
                 type: 'string',
-                description: '제목',
+                description: 'title of the chat, in the language of the user',
               },
             },
             required: ['title'],
