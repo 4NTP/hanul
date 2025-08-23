@@ -55,6 +55,11 @@
   "chat": {
     "untitled": "제목 없음",
     "newChat": "새 채팅",
+    "subAgents": "서브 에이전트",
+    "subAgentsEmpty": "등록된 서브 에이전트가 없습니다",
+    "prompt": "프롬프트",
+    "history": "변경 이력",
+    "noChanges": "변경 사항 없음",
     "input": {
       "placeholder": "메시지를 입력하세요..."
     },

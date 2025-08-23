@@ -338,6 +338,56 @@ export class AIService {
     return chats;
   }
 
+  async getSubAgents(userId: string) {
+    const chats = await this.db.chat.findMany({
+      where: { authorId: userId },
+      select: { id: true },
+    });
+    const chatIds = chats.map((c) => c.id);
+
+    if (chatIds.length === 0) return [];
+
+    const subAgents = await this.db.subAgent.findMany({
+      where: { chatId: { in: chatIds } },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const subAgentIds = subAgents.map((a) => a.id);
+    const histories: {
+      id: string;
+      subAgentId: string;
+      oldPrompt: string;
+      createdAt: Date;
+    }[] = subAgentIds.length
+      ? ((await this.db.$queryRaw<any[]>`
+            SELECT "id", "subAgentId", "oldPrompt", "createdAt"
+            FROM "SubAgentUpdateHistory"
+            WHERE "subAgentId" = ANY(${subAgentIds}::uuid[])
+            ORDER BY "createdAt" ASC
+          `) as any[])
+      : [];
+    const historiesByAgent = histories.reduce<
+      Record<string, { id: string; oldPrompt: string; createdAt: Date }[]>
+    >((acc, h) => {
+      (acc[h.subAgentId] ||= []).push({
+        id: h.id,
+        oldPrompt: h.oldPrompt,
+        createdAt: h.createdAt,
+      });
+      return acc;
+    }, {});
+
+    return subAgents.map((a) => ({
+      id: a.id,
+      name: a.name,
+      prompt: a.prompt,
+      chatId: a.chatId,
+      createdAt: a.createdAt,
+      updatedAt: a.updatedAt,
+      histories: historiesByAgent[a.id] || [],
+    }));
+  }
+
   private async processConversation(
     messages: ChatMessage[],
     observer: Observer<string>,
