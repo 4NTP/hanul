@@ -34,6 +34,190 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
   const [chats, setChats] = useState<Chat[]>([]);
+  const [expandedThink, setExpandedThink] = useState<Record<string, boolean>>(
+    {},
+  );
+
+  const markdownComponents = useMemo(() => {
+    return {
+      p: ({ children }: { children: React.ReactNode }) => (
+        <p className="mb-2 last:mb-0">{children}</p>
+      ),
+      h1: ({ children }: { children: React.ReactNode }) => (
+        <h1 className="text-lg font-bold mb-2">{children}</h1>
+      ),
+      h2: ({ children }: { children: React.ReactNode }) => (
+        <h2 className="text-base font-bold mb-2">{children}</h2>
+      ),
+      h3: ({ children }: { children: React.ReactNode }) => (
+        <h3 className="text-sm font-bold mb-1">{children}</h3>
+      ),
+      ul: ({ children }: { children: React.ReactNode }) => (
+        <ul className="list-disc pl-4 mb-2">{children}</ul>
+      ),
+      ol: ({ children }: { children: React.ReactNode }) => (
+        <ol className="list-decimal pl-4 mb-2">{children}</ol>
+      ),
+      li: ({ children }: { children: React.ReactNode }) => (
+        <li className="mb-1">{children}</li>
+      ),
+      blockquote: ({ children }: { children: React.ReactNode }) => (
+        <blockquote className="border-l-4 border-muted-foreground pl-4 italic mb-2">
+          {children}
+        </blockquote>
+      ),
+      code: ({
+        children,
+        className,
+      }: {
+        children: React.ReactNode;
+        className?: string;
+      }) => {
+        const isInline = !className;
+        return isInline ? (
+          <code className="bg-muted/60 border border-border px-2 py-1 rounded text-xs font-mono">
+            {children}
+          </code>
+        ) : (
+          <code className={`${className} text-xs font-mono`}>{children}</code>
+        );
+      },
+      pre: ({ children }: { children: React.ReactNode }) => (
+        <pre className="bg-muted/80 border border-border p-4 rounded-lg overflow-x-auto text-xs font-mono mb-3 shadow-sm">
+          {children}
+        </pre>
+      ),
+      strong: ({ children }: { children: React.ReactNode }) => (
+        <strong className="font-bold">{children}</strong>
+      ),
+      em: ({ children }: { children: React.ReactNode }) => (
+        <em className="italic">{children}</em>
+      ),
+      a: ({ children, href }: { children: React.ReactNode; href?: string }) => (
+        <a
+          href={href}
+          className="text-blue-500 hover:text-blue-700 underline"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {children}
+        </a>
+      ),
+    } as const;
+  }, []);
+
+  const parseThinkSegments = useCallback((text: string) => {
+    const segments: { type: 'think' | 'text'; content: string }[] = [];
+    const openTag = '<thinking>';
+    const closeTag = '</thinking>';
+    let cursor = 0;
+    while (cursor < text.length) {
+      const openIdx = text.indexOf(openTag, cursor);
+      if (openIdx === -1) {
+        segments.push({ type: 'text', content: text.slice(cursor) });
+        break;
+      }
+      if (openIdx > cursor) {
+        segments.push({ type: 'text', content: text.slice(cursor, openIdx) });
+      }
+      const closeIdx = text.indexOf(closeTag, openIdx + openTag.length);
+      if (closeIdx === -1) {
+        // No closing tag; treat rest as think
+        segments.push({
+          type: 'think',
+          content: text.slice(openIdx + openTag.length),
+        });
+        break;
+      }
+      segments.push({
+        type: 'think',
+        content: text.slice(openIdx + openTag.length, closeIdx),
+      });
+      cursor = closeIdx + closeTag.length;
+    }
+    return segments;
+  }, []);
+
+  const renderMessageText = useCallback(
+    (keyPrefix: string, text: string) => {
+      const segments = parseThinkSegments(text);
+      return (
+        <>
+          {segments.map((seg, idx) =>
+            seg.type === 'think' ? (
+              <div
+                key={`think-${keyPrefix}-${idx}`}
+                className="mb-2 rounded-md border border-amber-300 bg-amber-50"
+              >
+                <button
+                  type="button"
+                  onClick={() =>
+                    setExpandedThink((prev) => ({
+                      ...prev,
+                      [`${keyPrefix}-${idx}`]: !prev[`${keyPrefix}-${idx}`],
+                    }))
+                  }
+                  className="flex w-full items-center justify-between px-3 py-2 text-left"
+                >
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+                    {t('think')}
+                  </span>
+                  <span className="text-amber-700 text-xs">
+                    {expandedThink[`${keyPrefix}-${idx}`] ? '▼' : '▶'}
+                  </span>
+                </button>
+                {expandedThink[`${keyPrefix}-${idx}`] ? (
+                  <div className="px-3 pb-3">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      rehypePlugins={[rehypeHighlight]}
+                      components={markdownComponents as any}
+                    >
+                      {seg.content}
+                    </ReactMarkdown>
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <ReactMarkdown
+                key={`text-${keyPrefix}-${idx}`}
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeHighlight]}
+                components={markdownComponents as any}
+              >
+                {seg.content}
+              </ReactMarkdown>
+            ),
+          )}
+        </>
+      );
+    },
+    [markdownComponents, parseThinkSegments, t, expandedThink],
+  );
+
+  const mergeConsecutiveAI = useCallback((list: Message[]): Message[] => {
+    const merged: Message[] = [];
+    const SUB_PREFIX_RE = /^\[sub:[^\]]+\]\s*/;
+    for (const msg of list) {
+      if (
+        merged.length > 0 &&
+        merged[merged.length - 1]?.sender === 'ai' &&
+        msg.sender === 'ai'
+      ) {
+        const prev = merged[merged.length - 1]!;
+        const cleaned = msg.text.replace(SUB_PREFIX_RE, '').trim();
+        const combined = cleaned ? `${prev.text}\n\n${cleaned}` : prev.text;
+        merged[merged.length - 1] = {
+          id: prev.id,
+          sender: 'ai',
+          text: combined,
+        };
+      } else {
+        merged.push({ id: msg.id, sender: msg.sender, text: msg.text });
+      }
+    }
+    return merged;
+  }, []);
 
   // Load chat history mutation
   const loadChatListMutation = useMutation({
@@ -46,14 +230,17 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
   const loadChatDetailMutation = useMutation({
     mutationFn: chatAPI.getChatById,
     onSuccess: (histories) => {
-      const chatMessages: Message[] = (histories || []).map(
-        (history, index) => ({
+      const chatMessages: Message[] = (histories || [])
+        .filter((h) => h.role !== 'tool')
+        .map((history, index) => ({
           id: history.id ? `${history.id}` : `${index}`,
-          text: history.content,
+          text:
+            history.role === 'assistant' && history.name
+              ? `[sub:${history.name}] ${history.content}`
+              : history.content,
           sender: history.role === 'user' ? 'user' : 'ai',
-        }),
-      );
-      setMessages(chatMessages);
+        }));
+      setMessages(mergeConsecutiveAI(chatMessages));
     },
   });
 
@@ -149,7 +336,7 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
               }
             }
 
-            if (data.trim() !== '[DONE]' && !data.includes('"id"')) {
+            if (data.trim() !== '{{DONE}}' && !data.includes('"id"')) {
               fullResponse += data;
               setCurrentResponse(fullResponse);
             }
@@ -167,7 +354,21 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
           text: fullResponse.trim(),
           sender: 'ai',
         };
-        setMessages((prev) => [...prev, aiMessage]);
+        setMessages((prev) => {
+          if (prev.length > 0 && prev[prev.length - 1]?.sender === 'ai') {
+            const last = prev[prev.length - 1]!;
+            const combined = last.text
+              ? `${last.text}\n\n${aiMessage.text}`
+              : aiMessage.text;
+            const updated: Message = {
+              id: last.id,
+              sender: 'ai',
+              text: combined,
+            };
+            return [...prev.slice(0, -1), updated];
+          }
+          return [...prev, aiMessage];
+        });
         setCurrentResponse('');
 
         // Auto-scroll to bottom after AI response
@@ -183,6 +384,10 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
           );
         }
         loadChatListMutation.mutate();
+        const detailId = chatIdFromResponse || chatId;
+        if (detailId) {
+          loadChatDetailMutation.mutate(detailId);
+        }
       }
     },
   });
@@ -284,76 +489,25 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
                       : 'bg-muted'
                   }`}
                 >
+                  <div className="text-xs text-muted-foreground/80 mb-1">
+                    {/* SubAgent label if present in history.name — we inject it into text prefix as [sub:...] */}
+                    {(() => {
+                      const match = message.text.match(/^\[sub:([^\]]+)\]\s*/);
+                      if (match) {
+                        return (
+                          <span className="inline-block rounded bg-amber-100 text-amber-800 px-2 py-0.5 mr-1 align-middle">
+                            {match[1]}
+                          </span>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
                   <div className="text-sm">
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      rehypePlugins={[rehypeHighlight]}
-                      components={{
-                        p: ({ children }) => (
-                          <p className="mb-2 last:mb-0">{children}</p>
-                        ),
-                        h1: ({ children }) => (
-                          <h1 className="text-lg font-bold mb-2">{children}</h1>
-                        ),
-                        h2: ({ children }) => (
-                          <h2 className="text-base font-bold mb-2">
-                            {children}
-                          </h2>
-                        ),
-                        h3: ({ children }) => (
-                          <h3 className="text-sm font-bold mb-1">{children}</h3>
-                        ),
-                        ul: ({ children }) => (
-                          <ul className="list-disc pl-4 mb-2">{children}</ul>
-                        ),
-                        ol: ({ children }) => (
-                          <ol className="list-decimal pl-4 mb-2">{children}</ol>
-                        ),
-                        li: ({ children }) => (
-                          <li className="mb-1">{children}</li>
-                        ),
-                        blockquote: ({ children }) => (
-                          <blockquote className="border-l-4 border-muted-foreground pl-4 italic mb-2">
-                            {children}
-                          </blockquote>
-                        ),
-                        code: ({ children, className }) => {
-                          const isInline = !className;
-                          return isInline ? (
-                            <code className="bg-muted/60 border border-border px-2 py-1 rounded text-xs font-mono">
-                              {children}
-                            </code>
-                          ) : (
-                            <code className={`${className} text-xs font-mono`}>
-                              {children}
-                            </code>
-                          );
-                        },
-                        pre: ({ children }) => (
-                          <pre className="bg-muted/80 border border-border p-4 rounded-lg overflow-x-auto text-xs font-mono mb-3 shadow-sm">
-                            {children}
-                          </pre>
-                        ),
-                        strong: ({ children }) => (
-                          <strong className="font-bold">{children}</strong>
-                        ),
-                        em: ({ children }) => (
-                          <em className="italic">{children}</em>
-                        ),
-                        a: ({ children, href }) => (
-                          <a
-                            href={href}
-                            className="text-blue-500 hover:text-blue-700 underline"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            {children}
-                          </a>
-                        ),
-                      }}
-                    >
-                      {message.text}
-                    </ReactMarkdown>
+                    {renderMessageText(
+                      message.id,
+                      message.text.replace(/^\[sub:[^\]]+\]\s*/, ''),
+                    )}
                   </div>
                 </div>
               </div>
@@ -373,75 +527,7 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
                 </div>
                 <div className="max-w-[85%] sm:max-w-lg md:max-w-xl lg:max-w-2xl rounded-lg px-4 py-2 bg-muted">
                   <div className="text-sm">
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      rehypePlugins={[rehypeHighlight]}
-                      components={{
-                        p: ({ children }) => (
-                          <p className="mb-2 last:mb-0">{children}</p>
-                        ),
-                        h1: ({ children }) => (
-                          <h1 className="text-lg font-bold mb-2">{children}</h1>
-                        ),
-                        h2: ({ children }) => (
-                          <h2 className="text-base font-bold mb-2">
-                            {children}
-                          </h2>
-                        ),
-                        h3: ({ children }) => (
-                          <h3 className="text-sm font-bold mb-1">{children}</h3>
-                        ),
-                        ul: ({ children }) => (
-                          <ul className="list-disc pl-4 mb-2">{children}</ul>
-                        ),
-                        ol: ({ children }) => (
-                          <ol className="list-decimal pl-4 mb-2">{children}</ol>
-                        ),
-                        li: ({ children }) => (
-                          <li className="mb-1">{children}</li>
-                        ),
-                        blockquote: ({ children }) => (
-                          <blockquote className="border-l-4 border-muted-foreground pl-4 italic mb-2">
-                            {children}
-                          </blockquote>
-                        ),
-                        code: ({ children, className }) => {
-                          const isInline = !className;
-                          return isInline ? (
-                            <code className="bg-muted/60 border border-border px-2 py-1 rounded text-xs font-mono">
-                              {children}
-                            </code>
-                          ) : (
-                            <code className={`${className} text-xs font-mono`}>
-                              {children}
-                            </code>
-                          );
-                        },
-                        pre: ({ children }) => (
-                          <pre className="bg-muted/80 border border-border p-4 rounded-lg overflow-x-auto text-xs font-mono mb-3 shadow-sm">
-                            {children}
-                          </pre>
-                        ),
-                        strong: ({ children }) => (
-                          <strong className="font-bold">{children}</strong>
-                        ),
-                        em: ({ children }) => (
-                          <em className="italic">{children}</em>
-                        ),
-                        a: ({ children, href }) => (
-                          <a
-                            href={href}
-                            className="text-blue-500 hover:text-blue-700 underline"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            {children}
-                          </a>
-                        ),
-                      }}
-                    >
-                      {currentResponse}
-                    </ReactMarkdown>
+                    {renderMessageText('stream', currentResponse)}
                     <span className="animate-pulse">▋</span>
                   </div>
                 </div>

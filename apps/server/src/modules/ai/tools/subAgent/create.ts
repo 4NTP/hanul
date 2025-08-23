@@ -13,19 +13,24 @@ export const subAgentCreateTool = {
           description:
             'The Prompt For Sub Agent. Need About Problem And Resolve Scenario',
         },
+        name: {
+          type: 'string',
+          description: 'The Name For Sub Agent',
+        },
       },
-      required: ['prompt'],
+      required: ['prompt', 'name'],
     },
   },
 };
 
 export async function CreateSubAgent(
   Db: DbService,
-  chatId,
+  chatId: string,
+  name: string,
   { prompt }: { prompt: string },
 ) {
   const subAgent = await Db.subAgent.create({
-    data: { prompt, chat: { connect: { id: chatId } } },
+    data: { prompt, name, chat: { connect: { id: chatId } } },
   });
   return { subAgent };
 }

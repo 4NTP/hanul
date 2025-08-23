@@ -3,7 +3,7 @@ export const fetchTool = {
   function: {
     name: 'fetch',
     description:
-      'Fetch content from a URL. Use this to get specific web pages or API responses.',
+      'Fetch content from a URL. After fetching, ALWAYS synthesize the result for the user (do not dump raw). If incomplete, chain with other tools or ask the user a clarifying question before finalizing.',
     parameters: {
       type: 'object',
       properties: {
