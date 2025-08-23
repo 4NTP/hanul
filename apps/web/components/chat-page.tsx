@@ -48,7 +48,7 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, loading } = useAuth();
   const [chats, setChats] = useState<Chat[]>([]);
   const [expandedThink, setExpandedThink] = useState<Record<string, boolean>>(
     {},
@@ -57,19 +57,19 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [isMentionOpen, setIsMentionOpen] = useState(false);
+  const [imeComposing, setImeComposing] = useState(false);
   const [mentionQuery, setMentionQuery] = useState('');
   const [mentionStart, setMentionStart] = useState<number | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
-  const [inputScrollTop, setInputScrollTop] = useState(0);
-  const [overlayStyle, setOverlayStyle] = useState<React.CSSProperties>({});
+  // Removed input overlay highlight per request
   const { push } = useToast();
   const prevAgentsRef = useRef<SubAgentDto[] | null>(null);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated && !loading) {
       router.push(`/`);
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, router, loading]);
 
   const agentsQuery = useQuery({
     queryKey: ['agents'],
@@ -207,6 +207,27 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
     [push],
   );
 
+  // Linkify mentions when rendering messages (input overlay removed)
+  const linkifyMentions = useCallback(
+    (text: string) => {
+      const names = new Set(
+        (agentsQuery.data || [])
+          .map((a) => (a.name || '').toLowerCase())
+          .filter((n) => n.length > 0),
+      );
+      // Highlight from @ until whitespace; underscores are treated as spaces for matching
+      return text.replace(/@([^\s]+)/gu, (_m, raw: string) => {
+        const shown = String(raw || '');
+        const canonical = shown.replace(/_/g, ' ');
+        if (names.has(canonical.toLowerCase())) {
+          return `[${'@' + shown}](mention:${canonical})`;
+        }
+        return '@' + shown;
+      });
+    },
+    [agentsQuery.data],
+  );
+
   const renderMessageText = useCallback(
     (keyPrefix: string, text: string) => {
       const segments = parseThinkSegments(text);
@@ -254,15 +275,17 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
                 rehypePlugins={[rehypeHighlight]}
                 components={markdownComponents as any}
               >
-                {seg.content}
+                {linkifyMentions(seg.content)}
               </ReactMarkdown>
             ),
           )}
         </>
       );
     },
-    [markdownComponents, parseThinkSegments, t, expandedThink],
+    [markdownComponents, parseThinkSegments, t, expandedThink, linkifyMentions],
   );
+
+  // Mentions highlighting for messages is removed per simplification request
 
   const renderPromptDiffs = useCallback(
     (agent: SubAgentDto) => {
@@ -302,99 +325,11 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
     [t],
   );
 
-  const transformMentions = useCallback(
-    (text: string) => {
-      const names = new Set(
-        (agentsQuery.data || [])
-          .map((a) => (a.name || '').toLowerCase())
-          .filter((n) => n.length > 0),
-      );
-      let out = text;
-      // Support @word (Unicode letters/numbers/_/-.), underscores map to spaces for canonical lookup
-      out = out.replace(/@([\p{L}\p{N}_\-.]+)/gu, (_m, raw: string) => {
-        const name = String(raw || '');
-        // underscores are treated as spaces when resolving to agent canonical name
-        const canonical = name.replace(/_/g, ' ');
-        if (names.has(canonical.toLowerCase())) {
-          // Keep visual as typed (with underscores), link to canonical with spaces
-          return `[${'@' + name}](mention:${canonical})`;
-        }
-        return '@' + name;
-      });
-      return out;
-    },
-    [agentsQuery.data],
-  );
+  // Mentions are no longer transformed into links; we only highlight in the input overlay
 
-  const escapeHtml = useCallback(
-    (s: string) =>
-      s
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#39;'),
-    [],
-  );
+  // Removed input overlay highlight helpers
 
-  const buildHighlightedInputHtml = useCallback(() => {
-    const names = new Set(
-      (agentsQuery.data || [])
-        .map((a) => (a.name || '').toLowerCase())
-        .filter((n) => n.length > 0),
-    );
-    const pattern = /@[\p{L}\p{N}_\-.]+/gu;
-    const input = inputValue;
-    let last = 0;
-    let out = '';
-    for (const m of input.matchAll(pattern)) {
-      const idx = m.index ?? 0;
-      if (idx > last) {
-        out += escapeHtml(input.slice(last, idx));
-      }
-      const full = m[0];
-      const raw = full.slice(1);
-      const canonical = raw.replace(/_/g, ' ');
-      if (raw && names.has(canonical.toLowerCase())) {
-        out += `<span class=\"inline-flex items-center rounded-sm bg-sky-100 text-sky-800 px-1 py-0.5\">@${escapeHtml(
-          raw,
-        )}</span>`;
-      } else {
-        out += escapeHtml(full);
-      }
-      last = idx + full.length;
-    }
-    if (last < input.length) out += escapeHtml(input.slice(last));
-    // Ensure empty line to preserve height when input ends with newline
-    return out.replace(/\n$/, '\n\u200b');
-  }, [agentsQuery.data, escapeHtml, inputValue]);
-
-  useLayoutEffect(() => {
-    const ta = textareaRef.current;
-    if (!ta) return;
-    const compute = () => {
-      const cs = window.getComputedStyle(ta);
-      setOverlayStyle({
-        fontFamily: cs.fontFamily,
-        fontSize: cs.fontSize,
-        fontWeight: cs.fontWeight as any,
-        letterSpacing: cs.letterSpacing,
-        lineHeight: cs.lineHeight,
-        paddingTop: parseFloat(cs.paddingTop) || undefined,
-        paddingRight: parseFloat(cs.paddingRight) || undefined,
-        paddingBottom: parseFloat(cs.paddingBottom) || undefined,
-        paddingLeft: parseFloat(cs.paddingLeft) || undefined,
-      });
-    };
-    compute();
-    const ro = new ResizeObserver(compute);
-    ro.observe(ta);
-    window.addEventListener('resize', compute);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener('resize', compute);
-    };
-  }, [textareaRef]);
+  // Removed overlay style sync
 
   const filteredMentions = useMemo(() => {
     const list = (agentsQuery.data || []).filter((a) => !a.deletedAt);
@@ -412,7 +347,14 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
       if (!textareaRef.current || mentionStart == null) return;
       const el = textareaRef.current;
       const before = inputValue.slice(0, mentionStart);
-      const after = inputValue.slice(el.selectionStart ?? inputValue.length);
+      // compute the full @token length starting at mentionStart to avoid leftover tail
+      const restFromAt = inputValue.slice(mentionStart + 1);
+      const tokenMatch = restFromAt.match(/^[\p{L}\p{N}_\-.]+/u);
+      const tokenLen = (
+        tokenMatch && tokenMatch[0] ? tokenMatch[0].length : 0
+      ) as number;
+      const tokenEnd = mentionStart + 1 + tokenLen;
+      const after = inputValue.slice(tokenEnd);
       const rawName = (chosen.name || 'unknown').trim();
       const safeName = rawName.replace(/\s+/g, '_');
       const insertion = `@${safeName} `;
@@ -832,9 +774,7 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
                   <div className="text-sm">
                     {renderMessageText(
                       message.id,
-                      transformMentions(
-                        message.text.replace(/^\[sub:[^\]]+\]\s*/, ''),
-                      ),
+                      message.text.replace(/^\[sub:[^\]]+\]\s*/, ''),
                     )}
                   </div>
                 </div>
@@ -855,10 +795,7 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
                 </div>
                 <div className="max-w-[85%] sm:max-w-lg md:max-w-xl lg:max-w-2xl rounded-lg px-4 py-2 bg-muted">
                   <div className="text-sm">
-                    {renderMessageText(
-                      'stream',
-                      transformMentions(currentResponse),
-                    )}
+                    {renderMessageText('stream', currentResponse)}
                     <span className="animate-pulse">▋</span>
                   </div>
                 </div>
@@ -1006,22 +943,6 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
         <div className="border-t p-3 sm:p-4 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="flex gap-2 items-end">
             <div className="relative flex-1">
-              <div
-                className="hidden pointer-events-none absolute inset-0 whitespace-pre-wrap break-words text-sm text-transparent selection:bg-transparent"
-                aria-hidden
-              >
-                <div
-                  className="[&_*]:align-middle"
-                  style={{
-                    ...overlayStyle,
-                    whiteSpace: 'pre-wrap',
-                    marginTop: -inputScrollTop,
-                  }}
-                  dangerouslySetInnerHTML={{
-                    __html: buildHighlightedInputHtml(),
-                  }}
-                />
-              </div>
               <Textarea
                 ref={textareaRef}
                 value={inputValue}
@@ -1029,9 +950,11 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
                 placeholder={t('input.placeholder')}
                 className="relative bg-transparent w-full max-h-48"
                 rows={3}
+                onCompositionStart={() => setImeComposing(true)}
+                onCompositionEnd={() => setImeComposing(false)}
                 onKeyDown={(e) => {
                   // Mention navigation
-                  if (isMentionOpen) {
+                  if (isMentionOpen && !imeComposing) {
                     if (e.key === 'ArrowDown') {
                       e.preventDefault();
                       setMentionIndex(
@@ -1065,8 +988,14 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
                   if (
                     e.key === 'Enter' &&
                     !e.shiftKey &&
-                    !e.nativeEvent.isComposing
+                    !e.nativeEvent.isComposing &&
+                    !imeComposing
                   ) {
+                    if (isMentionOpen) {
+                      e.preventDefault();
+                      selectMentionByIndex(mentionIndex);
+                      return;
+                    }
                     e.preventDefault();
                     sendMessage();
                   }
@@ -1082,6 +1011,7 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
                   ) {
                     return;
                   }
+                  if (imeComposing) return;
                   const el = e.currentTarget;
                   const caret = el.selectionStart ?? 0;
                   const val = el.value;
@@ -1118,7 +1048,7 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
                   setMentionQuery('');
                   setMentionStart(null);
                 }}
-                onScroll={(e) => setInputScrollTop(e.currentTarget.scrollTop)}
+                onScroll={undefined}
                 onFocus={() => setTimeout(() => scrollToBottom(), 100)}
               />
             </div>
