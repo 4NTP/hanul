@@ -6,12 +6,11 @@ import { Env } from '../config/env.schema';
 import { DbService } from '../db/db.service';
 import { availableTools } from './tools';
 import { fetchData } from './tools/http/fetch';
-import { executeWebSearch } from './tools/web/web-search';
+import { CreateSubAgent } from './tools/subAgent/create';
+import { executeSequentialThinking } from './tools/think/sequential-thinking';
 import { executeWebRead } from './tools/web/web-read';
-import {
-  executeSequentialThinking,
-  sequentialThinkingTool,
-} from './tools/think/sequential-thinking';
+import { executeWebSearch } from './tools/web/web-search';
+import { FindSubAgents } from './tools/subAgent/find';
 
 type ChatMessage = {
   role: 'user' | 'assistant' | 'tool' | 'system' | 'developer';
@@ -168,6 +167,14 @@ export class AIService {
         args,
       );
     },
+    create_sub_agent: async (args: { prompt: string; chatId: string }) => {
+      return await CreateSubAgent(this.db, args.chatId, {
+        prompt: args.prompt,
+      });
+    },
+    find_sub_agent: async (args: { chatId: string }) => {
+      return await FindSubAgents(this.db, args.chatId);
+    },
   };
 
   constructor(
@@ -271,10 +278,9 @@ export class AIService {
 
       return baseMsg;
     });
-
     const response = await this.openai.chat.completions.create({
       model: 'solar-pro2',
-      messages: openaiMessages,
+      messages: [{ role: 'system', content: defaultPrompt }, ...openaiMessages],
       tools: availableTools,
       tool_choice: 'auto',
     } as OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming);
@@ -295,6 +301,20 @@ export class AIService {
             const functionToCall = this.availableFunctions[functionName];
 
             if (functionToCall) {
+              switch (functionName) {
+                case 'create_sub_agent':
+                  toolCall.function.arguments = JSON.stringify({
+                    ...JSON.parse(toolCall.function.arguments),
+                    chatId,
+                  });
+                  break;
+                case 'find_sub_agent':
+                  toolCall.function.arguments = JSON.stringify({
+                    ...JSON.parse(toolCall.function.arguments),
+                    chatId,
+                  });
+                  break;
+              }
               const functionArgs = JSON.parse(toolCall.function.arguments);
               const functionResponse = await functionToCall(functionArgs);
 
