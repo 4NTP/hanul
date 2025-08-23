@@ -11,7 +11,7 @@ export interface SubAgentDto {
   chatId: string;
   createdAt: string;
   updatedAt: string;
-  histories: SubAgentHistory[];
+  updateHistories?: SubAgentHistory[];
 }
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_SERVER_URL;
@@ -37,5 +37,18 @@ export const agentsAPI = {
     }
     const result = await response.json();
     return result.data || result;
+  },
+  update: async (id: string, prompt: string): Promise<SubAgentDto> => {
+    const response = await fetch(`${API_BASE_URL}/agents/${id}`, {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({ prompt }),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to update agent');
+    }
+    return await response.json();
   },
 };

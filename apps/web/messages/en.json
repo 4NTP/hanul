@@ -60,6 +60,10 @@
     "prompt": "Prompt",
     "history": "History",
     "noChanges": "No changes",
+    "details": "Details",
+    "close": "Close",
+    "save": "Save",
+    "cancel": "Cancel",
     "input": {
       "placeholder": "Type a message..."
     },

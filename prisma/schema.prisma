@@ -58,9 +58,11 @@ model SubAgent {
 }
 
 model SubAgentUpdateHistory {
-  id         String   @id @default(uuid()) @db.Uuid
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   subAgent   SubAgent @relation(fields: [subAgentId], references: [id], onDelete: Cascade)
   subAgentId String   @db.Uuid
   oldPrompt  String
   createdAt  DateTime @default(now())
+
+  @@index([subAgentId, createdAt])
 }

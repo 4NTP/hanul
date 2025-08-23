@@ -18,6 +18,9 @@ import dynamic from 'next/dynamic';
 const DiffView = dynamic(() => import('./diff-view').then((m) => m.DiffView), {
   ssr: false,
 });
+const AgentPromptEditor = dynamic(() => import('./agent-prompt-editor'), {
+  ssr: false,
+});
 
 interface Message {
   id: string;
@@ -37,7 +40,7 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [chats, setChats] = useState<Chat[]>([]);
   const [expandedThink, setExpandedThink] = useState<Record<string, boolean>>(
     {},
@@ -45,11 +48,21 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.push(`/${locale}`);
+    }
+  }, [isAuthenticated, locale, router]);
+
   const agentsQuery = useQuery({
     queryKey: ['agents'],
     queryFn: agentsAPI.list,
     enabled: !!user,
   });
+
+  const selectedAgent: SubAgentDto | undefined = (agentsQuery.data || []).find(
+    (a) => a.id === selectedAgentId,
+  );
 
   const markdownComponents = useMemo(() => {
     return {
@@ -208,38 +221,43 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
     [markdownComponents, parseThinkSegments, t, expandedThink],
   );
 
-  const renderPromptDiffs = useCallback((agent: SubAgentDto) => {
-    // Build versions: [old1, old2, ..., current]
-    const versions: { id: string; text: string; createdAt: string }[] = [
-      ...(agent.histories || []).map((h) => ({
-        id: h.id,
-        text: h.oldPrompt,
-        createdAt: h.createdAt,
-      })),
-      {
-        id: 'current',
-        text: agent.prompt,
-        createdAt: new Date(agent.updatedAt || agent.createdAt).toISOString(),
-      },
-    ];
-    const items: React.ReactNode[] = [];
-    for (let i = 1; i < versions.length; i++) {
-      const prev = versions[i - 1]!;
-      const curr = versions[i]!;
-      items.push(
-        <div key={`${agent.id}-diff-${i}`} className="rounded border p-2">
-          <div className="text-[10px] text-muted-foreground mb-1">
-            v{i} → v{i + 1} ({new Date(curr.createdAt).toLocaleString()})
-          </div>
-          <DiffView oldText={prev.text} newText={curr.text} />
-        </div>,
-      );
-    }
-    if (items.length === 0) {
-      return <div className="text-xs text-muted-foreground">No changes</div>;
-    }
-    return <div className="space-y-2">{items}</div>;
-  }, []);
+  const renderPromptDiffs = useCallback(
+    (agent: SubAgentDto) => {
+      // Build versions: [old1, old2, ..., current]
+      const versions: { id: string; text: string; createdAt: string }[] = [
+        ...(agent.updateHistories || []).map((h) => ({
+          id: h.id,
+          text: h.oldPrompt,
+          createdAt: h.createdAt,
+        })),
+        {
+          id: 'current',
+          text: agent.prompt,
+          createdAt: new Date(agent.updatedAt || agent.createdAt).toISOString(),
+        },
+      ];
+      const items: React.ReactNode[] = [];
+      for (let i = 1; i < versions.length; i++) {
+        const prev = versions[i - 1]!;
+        const curr = versions[i]!;
+        items.push(
+          <div key={`${agent.id}-diff-${i}`} className="rounded border p-2">
+            <div className="text-[10px] text-muted-foreground mb-1">
+              v{i} → v{i + 1} ({new Date(curr.createdAt).toLocaleString()})
+            </div>
+            <DiffView oldText={prev.text} newText={curr.text} />
+          </div>,
+        );
+      }
+      if (items.length === 0) {
+        return (
+          <div className="text-xs text-muted-foreground">{t('noChanges')}</div>
+        );
+      }
+      return <div className="space-y-2">{items.reverse()}</div>;
+    },
+    [t],
+  );
 
   const mergeConsecutiveAI = useCallback((list: Message[]): Message[] => {
     const merged: Message[] = [];
@@ -475,7 +493,7 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
           <div className="text-xs font-semibold text-muted-foreground mb-2">
             {t('subAgents')}
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1 max-h-60 overflow-y-auto">
             {(agentsQuery.data || []).length === 0 && (
               <div className="flex items-center justify-center h-24 rounded-md border text-xs text-muted-foreground">
                 <span className="mr-2">🤖</span>
@@ -485,11 +503,7 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
             {(agentsQuery.data || []).map((agent) => (
               <button
                 key={agent.id}
-                onClick={() =>
-                  setSelectedAgentId((prev) =>
-                    prev === agent.id ? null : agent.id,
-                  )
-                }
+                onClick={() => setSelectedAgentId(agent.id)}
                 className={`w-full text-left rounded-md px-3 py-2 transition-colors ${selectedAgentId === agent.id ? 'bg-accent' : 'hover:bg-muted'}`}
               >
                 <div className="text-sm font-medium truncate">
@@ -502,28 +516,6 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
               </button>
             ))}
           </div>
-          {selectedAgentId && (
-            <div className="mt-3 rounded border p-2">
-              {(() => {
-                const agent = (agentsQuery.data || []).find(
-                  (a) => a.id === selectedAgentId,
-                );
-                if (!agent) return null;
-                return (
-                  <div className="space-y-2">
-                    <div className="text-xs font-semibold">{t('prompt')}</div>
-                    <pre className="max-h-40 overflow-auto text-xs whitespace-pre-wrap bg-muted/50 rounded p-2">
-                      {agent.prompt}
-                    </pre>
-                    <div className="text-xs font-semibold">{t('history')}</div>
-                    <div className="space-y-2 max-h-40 overflow-auto">
-                      {renderPromptDiffs(agent)}
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-          )}
         </div>
         <div className="space-y-1">
           {chats.map((c) => {
@@ -673,7 +665,7 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
                   <div className="text-xs font-semibold text-muted-foreground mb-2">
                     {t('subAgents')}
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-1 max-h-60 overflow-y-auto">
                     {(agentsQuery.data || []).length === 0 && (
                       <div className="flex items-center justify-center h-24 rounded-md border text-xs text-muted-foreground">
                         <span className="mr-2">🤖</span>
@@ -683,11 +675,7 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
                     {(agentsQuery.data || []).map((agent) => (
                       <button
                         key={agent.id}
-                        onClick={() =>
-                          setSelectedAgentId((prev) =>
-                            prev === agent.id ? null : agent.id,
-                          )
-                        }
+                        onClick={() => setSelectedAgentId(agent.id)}
                         className={`w-full text-left rounded-md px-3 py-2 transition-colors ${selectedAgentId === agent.id ? 'bg-accent' : 'hover:bg-muted'}`}
                       >
                         <div className="text-sm font-medium truncate">
@@ -700,29 +688,6 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
                       </button>
                     ))}
                   </div>
-                  {selectedAgentId &&
-                    (() => {
-                      const agent = (agentsQuery.data || []).find(
-                        (a) => a.id === selectedAgentId,
-                      );
-                      if (!agent) return null;
-                      return (
-                        <div className="mt-3 rounded border p-2">
-                          <div className="text-xs font-semibold">
-                            {t('prompt')}
-                          </div>
-                          <pre className="max-h-40 overflow-auto text-xs whitespace-pre-wrap bg-muted/50 rounded p-2">
-                            {agent.prompt}
-                          </pre>
-                          <div className="text-xs font-semibold mt-2">
-                            {t('history')}
-                          </div>
-                          <div className="space-y-2 max-h-40 overflow-auto">
-                            {renderPromptDiffs(agent)}
-                          </div>
-                        </div>
-                      );
-                    })()}
                 </div>
                 {chats.map((c) => {
                   const isActive = c.id === chatId;
@@ -744,6 +709,51 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
                     </button>
                   );
                 })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Right-side overlay for selected sub agent */}
+        {selectedAgent && (
+          <div className="fixed inset-0 z-40">
+            <div
+              className="absolute inset-0 bg-black/40"
+              onClick={() => setSelectedAgentId(null)}
+            />
+            <div className="absolute right-0 top-0 h-full w-full sm:w-[520px] bg-background border-l shadow-xl flex flex-col">
+              <div className="flex items-center justify-between p-3 border-b">
+                <div className="text-sm font-semibold truncate">
+                  {selectedAgent.name || t('untitled')} — {t('details')}
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setSelectedAgentId(null)}
+                  className="cursor-pointer"
+                >
+                  {t('close')}
+                </Button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-3 space-y-3">
+                <div>
+                  <div className="text-xs font-semibold mb-1">
+                    {t('prompt')}
+                  </div>
+                  <AgentPromptEditor
+                    agentId={selectedAgent.id}
+                    initialPrompt={selectedAgent.prompt}
+                    onUpdated={() => agentsQuery.refetch()}
+                  />
+                </div>
+                <div>
+                  <div className="text-xs font-semibold mb-1">
+                    {t('history')}
+                  </div>
+                  <div className="space-y-2 max-h-80 overflow-auto">
+                    {renderPromptDiffs(selectedAgent)}
+                  </div>
+                </div>
               </div>
             </div>
           </div>

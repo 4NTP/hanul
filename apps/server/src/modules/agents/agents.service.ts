@@ -5,27 +5,67 @@ import { DbService } from '../db/db.service';
 export class AgentsService {
   constructor(private readonly db: DbService) {}
 
-  async getAgentById(id: string) {
+  async getAgentById(userId: string, id: string) {
     return await this.db.subAgent.findUnique({
-      where: { id },
+      where: { id, chat: { authorId: userId } },
       include: {
-        histories: {
+        updateHistories: {
           orderBy: {
-            createdAt: 'desc',
+            createdAt: 'asc',
           },
         },
       },
     });
   }
 
-  async getAllAgents() {
-    return await this.db.subAgent.findMany();
+  async getAllAgents(userId: string) {
+    return await this.db.subAgent.findMany({
+      where: { chat: { authorId: userId } },
+      include: {
+        chat: {
+          select: {
+            authorId: true,
+          },
+        },
+        updateHistories: {
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
+      },
+    });
   }
 
-  async getRecentChangedAgent() {
+  async getRecentChangedAgent(userId: string) {
     return await this.db.subAgent.findFirst({
+      where: { chat: { authorId: userId } },
       orderBy: {
         updatedAt: 'desc',
+      },
+      include: {
+        chat: {
+          select: {
+            authorId: true,
+          },
+        },
+      },
+    });
+  }
+
+  async updateAgentPrompt(userId: string, id: string, prompt: string) {
+    console.log('updateAgentPrompt', userId, id, prompt);
+    return await this.db.subAgent.update({
+      where: { id, chat: { authorId: userId } },
+      data: { prompt },
+      include: {
+        updateHistories: {
+          orderBy: { createdAt: 'desc' },
+        },
+        chat: {
+          select: {
+            authorId: true,
+          },
+        },
       },
     });
   }

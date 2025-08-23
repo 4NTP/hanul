@@ -42,7 +42,7 @@ export class TokensController {
     return ApiResponse.Ok('Tokens generated', tokens);
   }
 
-  @Delete()
+  @Post('revoke')
   @ZodResponse({
     status: 200,
     description: 'Sign out',

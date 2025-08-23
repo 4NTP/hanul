@@ -93,7 +93,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { authAPI } = await import('@/lib/api/auth');
       await authAPI.signOut();
-    } catch (error) {}
+    } catch (error) {
+      console.error(error);
+    }
 
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');

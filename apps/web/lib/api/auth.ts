@@ -49,8 +49,8 @@ export const authAPI = {
 
   signOut: async (): Promise<void> => {
     const token = localStorage.getItem('accessToken');
-    const response = await fetch(`${API_BASE_URL}/tokens`, {
-      method: 'DELETE',
+    const response = await fetch(`${API_BASE_URL}/tokens/revoke`, {
+      method: 'POST',
       credentials: 'include',
       headers: {
         ...(token && { Authorization: `Bearer ${token}` }),

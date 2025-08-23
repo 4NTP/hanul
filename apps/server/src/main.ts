@@ -29,7 +29,7 @@ const bootstrap = async () => {
   app.enableCors({
     origin: corsOrigin,
     credentials: true,
-    methods: '*',
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
   } as CorsOptions);
 
   createSwagger(app);
