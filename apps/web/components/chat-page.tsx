@@ -310,16 +310,7 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
           .filter((n) => n.length > 0),
       );
       let out = text;
-      // Support @<name with spaces>
-      out = out.replace(/@<([^>]+)>/g, (_m, raw: string) => {
-        const name = String(raw || '').trim();
-        if (!name) return _m;
-        if (names.has(name.toLowerCase())) {
-          return `[${'@' + name}](mention:${name})`;
-        }
-        return _m;
-      });
-      // Support @word (Unicode letters/numbers/_/-.), avoid already converted mention: links
+      // Support @word (Unicode letters/numbers/_/-.), underscores map to spaces for canonical lookup
       out = out.replace(/@([\p{L}\p{N}_\-.]+)/gu, (_m, raw: string) => {
         const name = String(raw || '');
         // underscores are treated as spaces when resolving to agent canonical name
@@ -352,7 +343,7 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
         .map((a) => (a.name || '').toLowerCase())
         .filter((n) => n.length > 0),
     );
-    const pattern = /@<([^>]+)>|@[\p{L}\p{N}_\-.]+/gu;
+    const pattern = /@[\p{L}\p{N}_\-.]+/gu;
     const input = inputValue;
     let last = 0;
     let out = '';
@@ -362,8 +353,8 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
         out += escapeHtml(input.slice(last, idx));
       }
       const full = m[0];
-      const raw = full.startsWith('@<') ? (m[1] || '').trim() : full.slice(1);
-      const canonical = full.startsWith('@<') ? raw : raw.replace(/_/g, ' ');
+      const raw = full.slice(1);
+      const canonical = raw.replace(/_/g, ' ');
       if (raw && names.has(canonical.toLowerCase())) {
         out += `<span class=\"inline-flex items-center rounded-sm bg-sky-100 text-sky-800 px-1 py-0.5\">@${escapeHtml(
           raw,
@@ -1096,66 +1087,31 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
                   const val = el.value;
                   const atIdx = val.lastIndexOf('@', caret - 1);
                   if (atIdx >= 0) {
-                    const afterAt = val[atIdx + 1];
                     const names = new Set(
                       (agentsQuery.data || [])
                         .map((a) => (a.name || '').toLowerCase())
                         .filter((n) => n.length > 0),
                     );
-                    // Bracketed mention @<name with spaces>
-                    if (afterAt === '<') {
-                      const closeIdx = val.indexOf('>', atIdx + 2);
-                      // Completed tag if '>' exists and caret is after it
-                      if (closeIdx !== -1 && caret > closeIdx) {
+                    // Only handle simple @word mentions
+                    const segment = val.slice(atIdx + 1, caret);
+                    if (/^[\p{L}\p{N}_\-.]{0,32}$/u.test(segment)) {
+                      // Do not open if exact match
+                      if (
+                        segment.length > 0 &&
+                        names.has(segment.toLowerCase())
+                      ) {
                         setIsMentionOpen(false);
                         setMentionQuery('');
                         setMentionStart(null);
                         return;
                       }
-                      // If caret is inside bracket, suggest by inner segment
-                      const segment = val.slice(atIdx + 2, caret);
-                      // Basic guard against invalid chars
-                      if (/^[^<>@]{0,64}$/.test(segment)) {
-                        // Do not open if exact match
-                        if (
-                          segment.length > 0 &&
-                          names.has(segment.toLowerCase())
-                        ) {
-                          setIsMentionOpen(false);
-                          setMentionQuery('');
-                          setMentionStart(null);
-                          return;
-                        }
-                        setIsMentionOpen(true);
-                        setMentionStart(atIdx);
-                        setMentionQuery(segment);
-                        setMentionIndex((i) =>
-                          segment !== mentionQuery ? 0 : i,
-                        );
-                        return;
-                      }
-                    } else {
-                      // Simple mention @word
-                      const segment = val.slice(atIdx + 1, caret);
-                      if (/^[\p{L}\p{N}_\-.]{0,32}$/u.test(segment)) {
-                        // Do not open if exact match
-                        if (
-                          segment.length > 0 &&
-                          names.has(segment.toLowerCase())
-                        ) {
-                          setIsMentionOpen(false);
-                          setMentionQuery('');
-                          setMentionStart(null);
-                          return;
-                        }
-                        setIsMentionOpen(true);
-                        setMentionStart(atIdx);
-                        setMentionQuery(segment);
-                        setMentionIndex((i) =>
-                          segment !== mentionQuery ? 0 : i,
-                        );
-                        return;
-                      }
+                      setIsMentionOpen(true);
+                      setMentionStart(atIdx);
+                      setMentionQuery(segment);
+                      setMentionIndex((i) =>
+                        segment !== mentionQuery ? 0 : i,
+                      );
+                      return;
                     }
                   }
                   setIsMentionOpen(false);
