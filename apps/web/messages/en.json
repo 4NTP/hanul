@@ -56,6 +56,7 @@
     "untitled": "Untitled",
     "newChat": "New chat",
     "subAgents": "Sub Agents",
+    "subAgentsEmpty": "No sub agents registered",
     "prompt": "Prompt",
     "history": "History",
     "noChanges": "No changes",

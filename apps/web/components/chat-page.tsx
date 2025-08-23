@@ -476,6 +476,12 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
             {t('subAgents')}
           </div>
           <div className="space-y-1">
+            {(agentsQuery.data || []).length === 0 && (
+              <div className="flex items-center justify-center h-24 rounded-md border text-xs text-muted-foreground">
+                <span className="mr-2">🤖</span>
+                {t('subAgentsEmpty')}
+              </div>
+            )}
             {(agentsQuery.data || []).map((agent) => (
               <button
                 key={agent.id}
@@ -668,6 +674,12 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
                     {t('subAgents')}
                   </div>
                   <div className="space-y-1">
+                    {(agentsQuery.data || []).length === 0 && (
+                      <div className="flex items-center justify-center h-24 rounded-md border text-xs text-muted-foreground">
+                        <span className="mr-2">🤖</span>
+                        {t('subAgentsEmpty')}
+                      </div>
+                    )}
                     {(agentsQuery.data || []).map((agent) => (
                       <button
                         key={agent.id}
