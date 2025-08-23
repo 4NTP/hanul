@@ -12,4 +12,12 @@ export class AgentsService {
   async getAllAgents() {
     return await this.db.subAgent.findMany();
   }
+
+  async getRecentChangedAgent() {
+    return await this.db.subAgent.findFirst({
+      orderBy: {
+        updatedAt: 'desc',
+      },
+    });
+  }
 }

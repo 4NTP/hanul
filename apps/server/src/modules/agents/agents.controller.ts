@@ -14,4 +14,9 @@ export class AgentsController {
   async getAllAgents() {
     return await this.agentsService.getAllAgents();
   }
+
+  @Get('recent')
+  async getRecentChangedAgent() {
+    return await this.agentsService.getRecentChangedAgent();
+  }
 }
