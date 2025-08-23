@@ -13,7 +13,6 @@ import {
 import { useToast } from '@hanul/ui/components/toast';
 import { useAuth } from '@/hooks/use-auth';
 import { useLocale, useTranslations } from 'next-intl';
-import { useRouter, useParams } from 'next/navigation';
 import Image from 'next/image';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { chatAPI } from '@/lib/api/chat';
@@ -23,6 +22,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import dynamic from 'next/dynamic';
+import { useRouter } from '@/i18n/navigation';
 const DiffView = dynamic(() => import('./diff-view').then((m) => m.DiffView), {
   ssr: false,
 });
@@ -756,7 +756,7 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
             return (
               <button
                 key={c.id}
-                onClick={() => router.push(`/${locale}/chat/${c.id}`)}
+                onClick={() => router.push(`/chat/${c.id}`)}
                 className={`w-full text-left rounded-md px-3 py-2 transition-colors ${
                   isActive ? 'bg-accent' : 'hover:bg-muted'
                 }`}
@@ -783,7 +783,7 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
           <Button
             variant="outline"
             onClick={() => {
-              router.push(`/${locale}/chat`);
+              router.push(`/chat`);
               setChatId(undefined);
               setMessages([]);
             }}
@@ -820,8 +820,8 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
                 <div
                   className={`max-w-[85%] sm:max-w-lg md:max-w-xl lg:max-w-2xl rounded-lg px-4 py-2 ${
                     message.sender === 'user'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted'
+                      ? 'bg-chart-4/15 dark:bg-chart-4/25 text-foreground'
+                      : 'bg-chart-2/15 dark:bg-chart-2/25 text-foreground'
                   }`}
                 >
                   <div className="text-xs text-muted-foreground/80 mb-1">
@@ -949,7 +949,7 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
                     <button
                       key={c.id}
                       onClick={() => {
-                        router.push(`/${locale}/chat/${c.id}`);
+                        router.push(`/chat/${c.id}`);
                         setMobileSidebarOpen(false);
                       }}
                       className={`w-full text-left rounded-md px-3 py-2 transition-colors ${
