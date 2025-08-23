@@ -55,6 +55,10 @@
   "chat": {
     "untitled": "Untitled",
     "newChat": "New chat",
+    "subAgents": "Sub Agents",
+    "prompt": "Prompt",
+    "history": "History",
+    "noChanges": "No changes",
     "input": {
       "placeholder": "Type a message..."
     },

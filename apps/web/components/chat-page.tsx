@@ -7,12 +7,17 @@ import { useAuth } from '@/hooks/use-auth';
 import { useLocale, useTranslations } from 'next-intl';
 import { useRouter, useParams } from 'next/navigation';
 import Image from 'next/image';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { chatAPI } from '@/lib/api/chat';
 import type { Chat } from '@/lib/api/chat';
+import { agentsAPI, type SubAgentDto } from '@/lib/api/agents';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
+import dynamic from 'next/dynamic';
+const DiffView = dynamic(() => import('./diff-view').then((m) => m.DiffView), {
+  ssr: false,
+});
 
 interface Message {
   id: string;
@@ -38,6 +43,13 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
     {},
   );
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+
+  const agentsQuery = useQuery({
+    queryKey: ['agents'],
+    queryFn: agentsAPI.list,
+    enabled: !!user,
+  });
 
   const markdownComponents = useMemo(() => {
     return {
@@ -195,6 +207,39 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
     },
     [markdownComponents, parseThinkSegments, t, expandedThink],
   );
+
+  const renderPromptDiffs = useCallback((agent: SubAgentDto) => {
+    // Build versions: [old1, old2, ..., current]
+    const versions: { id: string; text: string; createdAt: string }[] = [
+      ...agent.histories.map((h) => ({
+        id: h.id,
+        text: h.oldPrompt,
+        createdAt: h.createdAt,
+      })),
+      {
+        id: 'current',
+        text: agent.prompt,
+        createdAt: new Date(agent.updatedAt || agent.createdAt).toISOString(),
+      },
+    ];
+    const items: React.ReactNode[] = [];
+    for (let i = 1; i < versions.length; i++) {
+      const prev = versions[i - 1]!;
+      const curr = versions[i]!;
+      items.push(
+        <div key={`${agent.id}-diff-${i}`} className="rounded border p-2">
+          <div className="text-[10px] text-muted-foreground mb-1">
+            v{i} → v{i + 1} ({new Date(curr.createdAt).toLocaleString()})
+          </div>
+          <DiffView oldText={prev.text} newText={curr.text} />
+        </div>,
+      );
+    }
+    if (items.length === 0) {
+      return <div className="text-xs text-muted-foreground">No changes</div>;
+    }
+    return <div className="space-y-2">{items}</div>;
+  }, []);
 
   const mergeConsecutiveAI = useCallback((list: Message[]): Message[] => {
     const merged: Message[] = [];
@@ -426,6 +471,54 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
     <div className="flex h-[calc(100svh-3.5rem)]">
       {/* Desktop sidebar */}
       <aside className="w-64 border-r overflow-y-auto p-3 hidden md:block">
+        <div className="mb-4">
+          <div className="text-xs font-semibold text-muted-foreground mb-2">
+            {t('subAgents')}
+          </div>
+          <div className="space-y-1">
+            {(agentsQuery.data || []).map((agent) => (
+              <button
+                key={agent.id}
+                onClick={() =>
+                  setSelectedAgentId((prev) =>
+                    prev === agent.id ? null : agent.id,
+                  )
+                }
+                className={`w-full text-left rounded-md px-3 py-2 transition-colors ${selectedAgentId === agent.id ? 'bg-accent' : 'hover:bg-muted'}`}
+              >
+                <div className="text-sm font-medium truncate">
+                  {agent.name || t('untitled')}
+                </div>
+                <div className="text-xs text-muted-foreground truncate">
+                  {agent.prompt.replace(/\s+/g, ' ').slice(0, 80)}
+                  {agent.prompt.length > 80 ? '…' : ''}
+                </div>
+              </button>
+            ))}
+          </div>
+          {selectedAgentId && (
+            <div className="mt-3 rounded border p-2">
+              {(() => {
+                const agent = (agentsQuery.data || []).find(
+                  (a) => a.id === selectedAgentId,
+                );
+                if (!agent) return null;
+                return (
+                  <div className="space-y-2">
+                    <div className="text-xs font-semibold">{t('prompt')}</div>
+                    <pre className="max-h-40 overflow-auto text-xs whitespace-pre-wrap bg-muted/50 rounded p-2">
+                      {agent.prompt}
+                    </pre>
+                    <div className="text-xs font-semibold">{t('history')}</div>
+                    <div className="space-y-2 max-h-40 overflow-auto">
+                      {renderPromptDiffs(agent)}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+        </div>
         <div className="space-y-1">
           {chats.map((c) => {
             const isActive = c.id === chatId;
@@ -560,7 +653,7 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
             />
             <div className="absolute left-0 top-0 h-full w-4/5 max-w-[320px] bg-background border-r shadow-lg flex flex-col">
               <div className="flex items-center justify-between p-3 border-b">
-                <div className="text-sm font-medium">{t('newChat')}</div>
+                <div className="text-sm font-medium">{t('subAgents')}</div>
                 <Button
                   size="sm"
                   variant="ghost"
@@ -570,6 +663,55 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
                 </Button>
               </div>
               <div className="flex-1 overflow-y-auto p-3 space-y-1">
+                <div className="mb-3">
+                  <div className="text-xs font-semibold text-muted-foreground mb-2">
+                    {t('subAgents')}
+                  </div>
+                  <div className="space-y-1">
+                    {(agentsQuery.data || []).map((agent) => (
+                      <button
+                        key={agent.id}
+                        onClick={() =>
+                          setSelectedAgentId((prev) =>
+                            prev === agent.id ? null : agent.id,
+                          )
+                        }
+                        className={`w-full text-left rounded-md px-3 py-2 transition-colors ${selectedAgentId === agent.id ? 'bg-accent' : 'hover:bg-muted'}`}
+                      >
+                        <div className="text-sm font-medium truncate">
+                          {agent.name || t('untitled')}
+                        </div>
+                        <div className="text-xs text-muted-foreground truncate">
+                          {agent.prompt.replace(/\s+/g, ' ').slice(0, 80)}
+                          {agent.prompt.length > 80 ? '…' : ''}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                  {selectedAgentId &&
+                    (() => {
+                      const agent = (agentsQuery.data || []).find(
+                        (a) => a.id === selectedAgentId,
+                      );
+                      if (!agent) return null;
+                      return (
+                        <div className="mt-3 rounded border p-2">
+                          <div className="text-xs font-semibold">
+                            {t('prompt')}
+                          </div>
+                          <pre className="max-h-40 overflow-auto text-xs whitespace-pre-wrap bg-muted/50 rounded p-2">
+                            {agent.prompt}
+                          </pre>
+                          <div className="text-xs font-semibold mt-2">
+                            {t('history')}
+                          </div>
+                          <div className="space-y-2 max-h-40 overflow-auto">
+                            {renderPromptDiffs(agent)}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                </div>
                 {chats.map((c) => {
                   const isActive = c.id === chatId;
                   const title = c.title || t('untitled');

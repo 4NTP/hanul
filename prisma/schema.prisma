@@ -47,11 +47,20 @@ model ChatHistory {
 }
 
 model SubAgent {
-  id        String   @id @default(uuid()) @db.Uuid
-  name      String?  @unique
-  prompt    String
-  chat      Chat     @relation(fields: [chatId], references: [id])
-  chatId    String   @db.Uuid
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String                  @id @default(uuid()) @db.Uuid
+  name            String?                 @unique
+  prompt          String
+  chat            Chat                    @relation(fields: [chatId], references: [id])
+  chatId          String                  @db.Uuid
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  updateHistories SubAgentUpdateHistory[]
+}
+
+model SubAgentUpdateHistory {
+  id         String   @id @default(uuid()) @db.Uuid
+  subAgent   SubAgent @relation(fields: [subAgentId], references: [id], onDelete: Cascade)
+  subAgentId String   @db.Uuid
+  oldPrompt  String
+  createdAt  DateTime @default(now())
 }
