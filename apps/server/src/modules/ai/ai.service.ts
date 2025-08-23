@@ -171,7 +171,7 @@ export class AIService {
     find_sub_agent: async (args: { chatId: string }) => {
       return await FindSubAgents(this.db, args.chatId);
     },
-    run_sub_agent: async (args: { id: string; prompt: string }) => {
+    run_sub_agent: async (args: { id: string }) => {
       return await RunSubAgent(this.db, args.id);
     },
     update_sub_agent: async (args: { id: string; prompt: string }) => {
@@ -557,8 +557,19 @@ export class AIService {
       return;
     }
 
+    let tag;
     // 메시지 형식을 OpenAI 형식으로 변환
     const openaiMessages = messages.map((msg) => {
+      if (msg.content.includes('@')) {
+        const atIndex = msg.content.indexOf('@');
+        const spaceIndex = msg.content.indexOf(' ', atIndex);
+        tag =
+          spaceIndex !== -1
+            ? msg.content.slice(atIndex, spaceIndex)
+            : msg.content.slice(atIndex);
+        tag = tag.replaceAll('@', '');
+        msg.content = msg.content.replace(tag, '');
+      }
       const baseMsg: any = {
         role: msg.role,
         content: msg.content,
@@ -577,6 +588,15 @@ export class AIService {
       }
 
       return baseMsg;
+    });
+    if (tag.length > 0) {
+      const callFunction = this.availableFunctions['run_sub_agent'];
+      console.log(await callFunction({ id: tag }));
+    }
+
+    messages.push({
+      role: 'system' as const,
+      content: `답변에 다음 툴을 무조건 사용하세요 run_sub_agent: ${tag}`,
     });
 
     const response = await this.openai.chat.completions.create({
