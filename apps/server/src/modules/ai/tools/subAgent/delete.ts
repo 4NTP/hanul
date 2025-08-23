@@ -19,6 +19,6 @@ export const subAgentDeleteTool = {
 };
 
 export async function DeleteSubAgent(Db: DbService, { id }: { id: string }) {
-  await Db.subAgent.delete({ where: { id } });
+  await Db.subAgent.update({ where: { id }, data: { deletedAt: new Date() } });
   return { ok: true };
 }

@@ -22,7 +22,7 @@ export const subAgentFindTool = {
 
 export async function FindSubAgents(Db: DbService, chatId?: string) {
   const subAgents = await Db.subAgent.findMany({
-    where: { chatId: chatId || undefined },
+    where: { chatId: chatId || undefined, deletedAt: null },
     orderBy: { createdAt: 'desc' },
     select: { id: true, name: true, prompt: true, createdAt: true },
   });

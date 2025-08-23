@@ -1,4 +1,4 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Delete, Get, Param } from '@nestjs/common';
 import { AgentsService } from './agents.service';
 
 @Controller('agents')
@@ -18,5 +18,10 @@ export class AgentsController {
   @Get('recent')
   async getRecentChangedAgent() {
     return await this.agentsService.getRecentChangedAgent();
+  }
+
+  @Delete(':id')
+  async deleteAgent(@Param('id') id: string) {
+    return await this.agentsService.deleteAgent(id);
   }
 }

@@ -25,7 +25,7 @@ export const subAgentRunTool = {
 
 export async function RunSubAgent(Db: DbService, subAgentId: string) {
   const agent = await Db.subAgent.findUnique({
-    where: { id: subAgentId },
+    where: { id: subAgentId, deletedAt: null },
   });
   if (!agent) {
     throw new Error(`SubAgent with id ${subAgentId} not found`);

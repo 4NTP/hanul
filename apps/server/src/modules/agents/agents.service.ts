@@ -7,9 +7,9 @@ export class AgentsService {
 
   async getAgentById(id: string) {
     return await this.db.subAgent.findUnique({
-      where: { id },
+      where: { id, deletedAt: null },
       include: {
-        histories: {
+        updateHistories: {
           orderBy: {
             createdAt: 'desc',
           },
@@ -19,14 +19,24 @@ export class AgentsService {
   }
 
   async getAllAgents() {
-    return await this.db.subAgent.findMany();
+    return await this.db.subAgent.findMany({
+      where: { deletedAt: null },
+    });
   }
 
   async getRecentChangedAgent() {
     return await this.db.subAgent.findFirst({
+      where: { deletedAt: null },
       orderBy: {
         updatedAt: 'desc',
       },
+    });
+  }
+
+  async deleteAgent(id: string) {
+    return await this.db.subAgent.update({
+      where: { id },
+      data: { deletedAt: new Date() },
     });
   }
 }
