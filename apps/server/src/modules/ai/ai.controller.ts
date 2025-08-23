@@ -24,7 +24,7 @@ export class AIController {
     @Body() { prompt }: CreateTextRequestDto,
     @Param('id') chatId: string,
   ) {
-    return await this.aiService.continueChat(user.name, chatId, prompt);
+    return await this.aiService.continueChat(user.id, chatId, prompt);
   }
 
   @Post('chat')
@@ -34,12 +34,18 @@ export class AIController {
     @CurrentUser() user,
     @Body() { prompt }: CreateTextRequestDto,
   ) {
-    return await this.aiService.startNewChat(user.name, prompt);
+    return await this.aiService.startNewChat(user.id, prompt);
   }
 
   @Get('chat')
   @UseGuards(TokensGuard)
-  async getChat(@CurrentUser() user) {
-    return await this.aiService.getChattings(user?.name);
+  async getChats(@CurrentUser() user) {
+    return await this.aiService.getChats(user?.id);
+  }
+
+  @Get('chat/:id')
+  @UseGuards(TokensGuard)
+  async getChatHistories(@CurrentUser() user, @Param('id') chatId: string) {
+    return await this.aiService.getChatHistories(user.id, chatId);
   }
 }

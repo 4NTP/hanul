@@ -51,5 +51,14 @@
     "signUpLink": "회원가입",
     "haveAccount": "이미 계정이 있나요?",
     "signInLink": "로그인"
+  },
+  "chat": {
+    "untitled": "제목 없음",
+    "newChat": "새 채팅",
+    "input": {
+      "placeholder": "메시지를 입력하세요..."
+    },
+    "send": "전송",
+    "sending": "전송 중..."
   }
 }

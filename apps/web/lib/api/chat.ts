@@ -18,8 +18,9 @@ export interface ChatHistory {
 
 export interface Chat {
   id: string;
+  title?: string;
   authorId: string;
-  histories: ChatHistory[];
+  histories?: ChatHistory[];
 }
 
 export interface GetChatsResponse {
@@ -92,6 +93,22 @@ export const chatAPI = {
     if (!response.ok) {
       const errorData = await response.json();
       throw new Error(errorData.message || 'Failed to get chats');
+    }
+
+    const result = await response.json();
+    return result.data || result;
+  },
+
+  getChatById: async (chatId: string): Promise<ChatHistory[]> => {
+    const response = await fetch(`${API_BASE_URL}/ai/chat/${chatId}`, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to get chat detail');
     }
 
     const result = await response.json();

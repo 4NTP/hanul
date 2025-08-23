@@ -51,5 +51,14 @@
     "signUpLink": "Sign up",
     "haveAccount": "Already have an account?",
     "signInLink": "Sign in"
+  },
+  "chat": {
+    "untitled": "Untitled",
+    "newChat": "New chat",
+    "input": {
+      "placeholder": "Type a message..."
+    },
+    "send": "Send",
+    "sending": "Sending..."
   }
 }
