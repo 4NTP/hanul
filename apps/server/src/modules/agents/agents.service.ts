@@ -6,7 +6,16 @@ export class AgentsService {
   constructor(private readonly db: DbService) {}
 
   async getAgentById(id: string) {
-    return await this.db.subAgent.findUnique({ where: { id } });
+    return await this.db.subAgent.findUnique({
+      where: { id },
+      include: {
+        histories: {
+          orderBy: {
+            createdAt: 'desc',
+          },
+        },
+      },
+    });
   }
 
   async getAllAgents() {
