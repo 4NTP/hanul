@@ -9,6 +9,7 @@ import { fetchData } from './tools/http/fetch';
 import { CreateSubAgent } from './tools/subAgent/create';
 import { FindSubAgents } from './tools/subAgent/find';
 import { RunSubAgent } from './tools/subAgent/run';
+import { UpdateSubAgent } from './tools/subAgent/update';
 import { executeWebRead } from './tools/web/web-read';
 import { executeWebSearch } from './tools/web/web-search';
 
@@ -32,7 +33,9 @@ const defaultPrompt = `
 당신은 Hanul이라 불리우는 **메인 에이전트**입니다. Upstage의 SolarLLM을 기반으로 하며, 사용자 요청을 분석하고, 적절한 서브 에이전트를 관리하여 최적의 결과를 제공하는 오케스트레이터 역할을 수행합니다.
 당신은 혼자선 아무것도 하지 못합니다. 오로지 서브 에이전트를 통해서 사용자가 원하는 답변을 내놓아야 합니다. 당신이 직접 답을 내놓을 수 없습니다.
 당신은 사용자의 요청을 받고 해석한 수 서브 에이전트의 프롬프트를 통해 처리하는 역할을 할 뿐 절대로 스스로 답변을 내놓아서는 안됩니다.
+서브 에이전트를 사용하는 순서는 언제나 존재하는 서브 에이전트 먼저입니다.
 사고 방식을 거치기 전에 반드시 대신할 수 있는 서브 에이전트가 있는지를 적절한 tools를 통해 확인하고, 그렇지 않다면 서브 에이전트를 새로 생성한 후 사용자에게 답변하세요.
+답변을 받은 후 사용자가 이에 대해 improve를 요구하면 서브 에이전트를 생성하지 말고 사용한 서브 에이전트의 prompt를 개선하세요.
 당신은 항상 서브 에이전트들의 프롬프트를 향상시키는데 일조합니다. 유저의 반응, 선택, 피드백을 분석하여 서브 에이전트의 프롬프트를 지속적으로 개선합니다.
 - **사용자 요청 분석**: 사용자의 요구사항을 정확히 파악하고, 이를 바탕으로 적합한 서브 에이전트를 선택하거나 생성합니다.
 - **서브 에이전트 관리**: 각 서브 에이전트의 전문성을 고려하여 작업을 분배하고, 필요시 새로운 서브 에이전트를 생성합니다.
@@ -63,7 +66,7 @@ const defaultPrompt = `
     ↓
 사용자 피드백
     ↓
-피드백 분석 및 반영하여 기존 에이전트의 prompt 수정
+피드백 분석 및 반영하여 **기존 에이전트**의 prompt 수정
 \`\`\`
 
 ## 4. 서브 에이전트 관리 명령어
@@ -168,8 +171,14 @@ export class AIService {
     find_sub_agent: async (args: { chatId: string }) => {
       return await FindSubAgents(this.db, args.chatId);
     },
-    run_sub_agent: async (args: { subAgentId: string; prompt: string }) => {
-      return await RunSubAgent(this.db, args.subAgentId);
+    run_sub_agent: async (args: { id: string; prompt: string }) => {
+      return await RunSubAgent(this.db, args.id);
+    },
+    update_sub_agent: async (args: { id: string; prompt: string }) => {
+      return await UpdateSubAgent(this.db, {
+        name: args.id,
+        prompt: args.prompt,
+      });
     },
   };
 
