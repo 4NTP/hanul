@@ -48,10 +48,4 @@ export class AIController {
   async getChatHistories(@CurrentUser() user, @Param('id') chatId: string) {
     return await this.aiService.getChatHistories(user.sub, chatId);
   }
-
-  @Get('agents')
-  @UseGuards(TokensGuard)
-  async getSubAgents(@CurrentUser() user) {
-    return await this.aiService.getSubAgents(user.sub);
-  }
 }

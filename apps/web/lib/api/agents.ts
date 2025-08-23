@@ -26,7 +26,7 @@ const getAuthHeaders = () => {
 
 export const agentsAPI = {
   list: async (): Promise<SubAgentDto[]> => {
-    const response = await fetch(`${API_BASE_URL}/ai/agents`, {
+    const response = await fetch(`${API_BASE_URL}/agents`, {
       method: 'GET',
       headers: getAuthHeaders(),
       credentials: 'include',
