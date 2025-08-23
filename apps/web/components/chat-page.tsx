@@ -211,7 +211,7 @@ export function ChatPage({ chatId: bChatId }: { chatId?: string }) {
   const renderPromptDiffs = useCallback((agent: SubAgentDto) => {
     // Build versions: [old1, old2, ..., current]
     const versions: { id: string; text: string; createdAt: string }[] = [
-      ...agent.histories.map((h) => ({
+      ...(agent.histories || []).map((h) => ({
         id: h.id,
         text: h.oldPrompt,
         createdAt: h.createdAt,
