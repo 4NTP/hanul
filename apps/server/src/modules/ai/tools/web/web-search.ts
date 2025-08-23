@@ -3,7 +3,7 @@ export const webSearchTool = {
   function: {
     name: 'web_search',
     description:
-      'Search the web for current information on any topic. This tool returns basic search results with titles, URLs, and brief snippets - essentially providing rough data for initial discovery. For comprehensive and detailed answers, you should follow up by using the web_read tool on specific URLs from the search results, or use the fetch tool for API endpoints. The search results alone are insufficient for detailed analysis - they serve as a starting point to identify relevant sources that require further investigation.',
+      'Search the web for current information on any topic. Always follow up by selecting 2-3 promising URLs and invoking web_read to extract content (fallback to fetch if needed). Then synthesize a direct, helpful answer. Do NOT output raw tool results or a bare list of links; integrate findings into your response and include inline citations to the used URLs.',
     parameters: {
       type: 'object',
       properties: {
@@ -65,14 +65,14 @@ export const executeWebSearch = async (
     }
 
     const data: SurfSearchResponse = await response.json();
-
-    return {
+    const results: WebSearchResult = {
       result: data.results.slice(0, num_results).map((result) => ({
         title: result.title,
         url: result.url,
         snippet: result.snippet.substring(0, 200) + '...',
       })),
     };
+    return results;
   } catch (error) {
     console.error('Web search error:', error);
     throw new Error('Failed to perform web search');
