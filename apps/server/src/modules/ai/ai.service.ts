@@ -32,18 +32,21 @@ const defaultPrompt = `
 ## 1. 핵심 역할 정의
 당신은 Hanul이라 불리우는 **메인 에이전트**입니다. Upstage의 SolarLLM을 기반으로 하며, 사용자 요청을 분석하고, 적절한 서브 에이전트를 관리하여 최적의 결과를 제공하는 오케스트레이터 역할을 수행합니다.
 당신은 혼자선 아무것도 하지 못합니다. 오로지 서브 에이전트를 통해서 사용자가 원하는 답변을 내놓아야 합니다. 당신이 직접 답을 내놓을 수 없습니다.
-사고를 전개하기 전에 무조건 존재하는 서브 에이전트를 조회하세요.
+사고를 전개하기 전에 무조건 존재하는 서브 에이전트를 조회하세요. 유저의 문제를 직접 해결하기보다 문제를 해결할 수 있는 서브 에이전트를 찾아서 활용하세요.
 이미 존재하는 서브 에이전트를 반드시 우선적으로 활용하세요. 만약 존재하는 서브 에이전트가 없다면 절대로 생성하지 말고 사용자에게 생성 허락을 구하세요.
 답변을 받은 후 사용자가 이에 대해 불평하거나 '수정'을 요구하면 사용한 서브 에이전트의 prompt를 수정하세요.
 - **사용자 요청 분석**: 사용자의 요구사항을 정확히 파악하고, 이를 바탕으로 적합한 서브 에이전트를 선택하거나 생성합니다.
 - **서브 에이전트 관리**: 각 서브 에이전트의 전문성을 고려하여 작업을 분배하고, 필요시 새로운 서브 에이전트를 생성합니다.
 - **도구 활용**: 필요에 따라 웹 검색, 데이터 조회 등 다양한 도구를 활용하여 정보를 보강하고, 응답의 정확성을 높입니다.
 - **프롬프트 최적화**: 서브 에이전트의 프롬프트를 지속적으로 개선하여, 더 나은 성능과 정확성을 달성합니다.
-- **반복 작업**: 완전히 완료되지 않았다고 판단이 생기면, "[REPEAT]" 문자열을 마지막에 사용하여 반복 작업이 필요하다고 알립니다. tool을 사용할 경우 "[REPEAT]" 문자열을 사용하지 않고, 사용하지 않더라도 반복 작업을 수행합니다.
+- **유저 정보 기록**: 답변의 질을 높이기 위해 유저 정보를 서브 에이전트 프롬프트에 기록하여 서브 에이전트의 성능을 개선합니다.
+- **유저 성향 파악**: 유저의 성향을 매 대화마다 파악하여 서브 에이전트의 프롬프트에 기록하여 서브 에이전트의 성능을 개선합니다.
+- **유저 피드백 반영**: 유저의 피드백을 반영하여 서브 에이전트의 프롬프트를 개선하여 서브 에이전트의 성능을 개선합니다.
+- **학습용 에이전트**: 유저가 학습용 에이전트를 활용할 경우 유저의 질문 내용과 수준을 토대로 학습 수준을 파악하여 서브 에이전트의 프롬프트에 기록하여 서브 에이전트의 성능을 개선합니다.
 
 ## 2. 서브 에이전트 관리 권한
 - **생성**: 새로운 전문 서브 에이전트 생성
-- **수정**: 기존 서브 에이전트 성능 개선
+- **수정**: 기존 서브 에이전트 성능 개선 및 유저 정보 기록
 - **삭제**: 불필요한 서브 에이전트 제거
 - **검색**: 적합한 서브 에이전트 탐색 및 활용
 
@@ -253,9 +256,16 @@ export class AIService {
     resolvedMessages.push({ role: 'user', content: prompt });
 
     return new Observable((observer) => {
-      this.processConversationB(resolvedMessages, observer, chat.id, 0).catch(
-        (err) => observer.error(err),
-      );
+      this.processConversationB(
+        resolvedMessages,
+        observer,
+        chat.id,
+        0,
+        undefined,
+        undefined,
+        undefined,
+        user.id,
+      ).catch((err) => observer.error(err));
     });
   }
 
@@ -372,6 +382,10 @@ export class AIService {
             observer,
             newChat.id,
             0,
+            undefined,
+            undefined,
+            undefined,
+            userId,
           );
         })
         .catch((err) => observer.error(err));
@@ -460,7 +474,7 @@ export class AIService {
     observer: Observer<string>,
     chatId: string,
     totalTokens: number,
-    maxIterations: number = 10,
+    maxIterations: number = 6,
     currentIteration: number = 0,
   ) {
     if (currentIteration >= maxIterations || totalTokens > 50000) {
@@ -602,14 +616,67 @@ export class AIService {
     observer: Observer<string>,
     chatId: string,
     totalTokens: number,
-    maxIterations: number = 10,
+    maxIterations: number = 15,
     currentIteration: number = 0,
+    ctxAgent: string = '',
+    userId: string,
   ): Promise<{ agentName: string } | null> {
     this.logger.log('current iter', currentIteration);
     this.logger.log('total tokens', totalTokens);
-    // 최대 반복 또는 토큰 제한 체크
-    if (currentIteration >= maxIterations || totalTokens > 50000) {
-      return null;
+    // 예산 한계 정의
+    const TOKEN_HARD_LIMIT = 150000;
+    const TOKEN_SOFT_LIMIT = 140000; // 하드 직전 여유 버퍼
+    const nearIterationLimit = currentIteration >= maxIterations - 1;
+    const nearTokenLimit = totalTokens >= TOKEN_SOFT_LIMIT;
+    const shouldForceFinish = nearIterationLimit || nearTokenLimit;
+
+    // 하드 제한 도달 시: 도구 호출 없이 최종 응답 생성 후 종료
+    if (currentIteration >= maxIterations || totalTokens > TOKEN_HARD_LIMIT) {
+      try {
+        const finalize = await this.openai.chat.completions.create({
+          model: 'solar-pro2',
+          messages: [
+            {
+              role: 'system',
+              content:
+                defaultPrompt +
+                ' [Finalization] You have reached the budget. Do NOT call tools. Provide a concise final answer now.',
+            },
+            ...(await Promise.all(
+              messages.map(async (m) => ({
+                role: m.role,
+                content: m.content,
+                ...(m.name ? { name: m.name } : {}),
+              })),
+            )),
+          ],
+          tools: [],
+          tool_choice: 'none',
+          temperature: 0,
+        } as OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming);
+        const finalText = finalize.choices[0]?.message?.content || '';
+        if (finalText) observer.next(finalText);
+      } catch (e) {
+        this.logger.error('finalize at hard limit failed', e);
+      } finally {
+        observer.complete();
+        try {
+          await this.db.chat.update({
+            where: { id: chatId },
+            data: {
+              histories: {
+                create: [
+                  {
+                    role: 'assistant',
+                    content: messages[messages.length - 1]?.content || '',
+                  },
+                ],
+              },
+            },
+          });
+        } catch {}
+        return null;
+      }
     }
 
     let tag = '';
@@ -635,17 +702,34 @@ export class AIService {
       return baseMsg;
     });
 
+    const subAgents = await this.getSubAgents(userId);
+    const subAgentNames = subAgents.map((subAgent) => subAgent.name);
+
     const response = await this.openai.chat.completions.create({
       model: 'solar-pro2',
-      messages: await Promise.all(openaiMessages),
-      tools: availableTools,
-      tool_choice: 'auto',
+      messages: [
+        {
+          role: 'system',
+          content:
+            defaultPrompt +
+            (shouldForceFinish
+              ? ' [Stop soon] Do NOT call tools. Provide a concise final answer now.'
+              : `(서브 에이전트 목록: ${subAgentNames.join(', ')})`),
+        },
+        ...(await Promise.all(openaiMessages)),
+      ],
+      tools: shouldForceFinish ? [] : availableTools,
+      tool_choice: shouldForceFinish
+        ? 'none'
+        : currentIteration === 0
+          ? 'required'
+          : 'auto',
       temperature: 0,
     } as OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming);
     const message = response.choices[0]?.message;
     const usage = response.usage;
-    let content,
-      ctxAgent = '';
+    let content = '';
+    // ctxAgent = '';
     totalTokens += usage?.total_tokens || 0;
     this.logger.log('tool_calls:', message?.tool_calls);
 
@@ -674,12 +758,17 @@ export class AIService {
                     chatId,
                   });
                   break;
+                case 'update_sub_agent':
+                  toolCall.function.arguments = JSON.stringify({
+                    ...JSON.parse(toolCall.function.arguments),
+                    chatId,
+                  });
+                  break;
                 case 'run_sub_agent':
                   const subAgent = await this.db.subAgent.findUnique({
                     where: { id: JSON.parse(toolCall.function.arguments).id },
                   });
                   ctxAgent = subAgent?.name || '';
-                  console.log(ctxAgent);
                   break;
               }
               const functionArgs = JSON.parse(toolCall.function.arguments);
@@ -721,6 +810,40 @@ export class AIService {
       });
       messages.push(...toolResults);
 
+      // 예산이 임박했다면 더 이상 재귀하지 않고 최종 답변 생성
+      if (shouldForceFinish) {
+        try {
+          const finalize = await this.openai.chat.completions.create({
+            model: 'solar-pro2',
+            messages: [
+              {
+                role: 'system',
+                content:
+                  defaultPrompt +
+                  ' [Finalization] Budget is nearly exhausted. Do NOT call tools. Provide a concise final answer now.',
+              },
+              ...(await Promise.all(
+                messages.map(async (m) => ({
+                  role: m.role,
+                  content: m.content,
+                  ...(m.name ? { name: m.name } : {}),
+                })),
+              )),
+            ],
+            tools: [],
+            tool_choice: 'none',
+            temperature: 0,
+          } as OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming);
+          const finalText = finalize.choices[0]?.message?.content || '';
+          if (finalText) observer.next(finalText);
+        } catch (e) {
+          this.logger.error('finalize at soft limit failed', e);
+        } finally {
+          observer.complete();
+        }
+        return { agentName: ctxAgent };
+      }
+
       // 재귀적으로 다음 응답 처리
       const recursiveResult = await this.processConversationB(
         messages,
@@ -729,29 +852,72 @@ export class AIService {
         totalTokens,
         maxIterations,
         currentIteration + 1,
+        ctxAgent,
+        userId,
       );
+      if (!recursiveResult) {
+        observer.next(message?.content || '');
+        observer.complete();
+        return null;
+      }
 
       // 재귀 호출에서 에이전트 이름이 반환되었으면 그것을 사용, 아니면 현재 ctxAgent 사용
       return { agentName: recursiveResult?.agentName || ctxAgent };
     } else {
       const content = message?.content || '';
       observer.next(content);
-      observer.complete();
 
-      // DB에 최종 응답 저장
-      await this.db.chat.update({
-        where: { id: chatId },
-        data: {
-          histories: {
-            create: [
+      console.log('hello userid', userId, ctxAgent);
+      if (userId !== '' && ctxAgent !== '') {
+        try {
+          const completion = await this.openai.chat.completions.create({
+            model: 'solar-pro2',
+            messages: [
               {
-                role: 'assistant',
-                content,
+                role: 'system',
+                content: defaultPrompt,
+              },
+              {
+                role: 'user',
+                content: `다음 내용은 ${ctxAgent} 에이전트의 응답입니다. [${content}]. 다음 내용은 에이전트의 프롬프트입니다. [${(await this.getSubAgents(userId)).filter((subAgent) => subAgent.name === ctxAgent)[0]?.prompt}] 해당 에이전트를 평가하여 prompt를 개선할 필요가 있다고 느낀다면 update_sub_agent 도구를 사용하여 개선하세요. 꼭 개선이 아니더라도 유저의 정보를 기록하여 서브 에이전트의 성능을 개선하세요. [주의] update_sub_agent 도구는 내용을 추가하기만 합니다. 한번에 너무 많은 양을 추가하지 마세요. [중요] 해당 함수로 추가하는 내용은 유저의 질문에 대한 응답을 추가하는 것이 아니라 서브 에이전트의 프롬프트를 개선하는 것입니다.`,
               },
             ],
+            tools: availableTools.filter(
+              (tool) => tool.function.name === 'update_sub_agent',
+            ),
+            tool_choice: 'required',
+            temperature: 0,
+          });
+          const toolCall = completion.choices[0]?.message.tool_calls?.[0];
+          if (toolCall && toolCall.type === 'function' && toolCall.function) {
+            const functionName = toolCall.function.name;
+            const functionToCall = this.availableFunctions[functionName];
+            const functionArgs = JSON.parse(toolCall.function.arguments);
+            const functionResponse = await functionToCall(functionArgs);
+          }
+        } catch {}
+      }
+
+      try {
+        // DB에 최종 응답 저장
+        await this.db.chat.update({
+          where: { id: chatId },
+          data: {
+            histories: {
+              create: [
+                {
+                  role: 'assistant',
+                  content,
+                },
+              ],
+            },
           },
-        },
-      });
+        });
+      } catch {
+        console.log('error');
+      }
+
+      observer.complete();
     }
     console.log('Agent used:', ctxAgent);
     return { agentName: ctxAgent || '' };

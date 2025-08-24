@@ -26,16 +26,25 @@ export async function UpdateSubAgent(
   Db: DbService,
   { name, prompt }: { name: string; prompt: string },
 ) {
-  console.log(name);
-  const subAgent = await Db.subAgent.findUnique({
+  let subAgent = await Db.subAgent.findUnique({
     where: { id: name },
   });
   if (!subAgent) {
-    throw new Error('SubAgent not found');
+    subAgent = await Db.subAgent.findUnique({
+      where: { name, prompt },
+    });
+    if (!subAgent) {
+      throw new Error('SubAgent not found');
+    }
+    const result = await Db.subAgent.update({
+      where: { name },
+      data: { prompt: (subAgent.prompt = prompt) },
+    });
+    return { result };
   }
   const result = await Db.subAgent.update({
     where: { id: name },
-    data: { prompt: (subAgent.prompt += prompt) },
+    data: { prompt: (subAgent.prompt = prompt) },
   });
   return { result };
 }
